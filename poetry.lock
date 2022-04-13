@@ -181,7 +181,7 @@ marker = "sys_platform == \"win32\""
 
 [metadata]
 python-versions = "^3.9"
-content-hash = "183440b29606860efcd3e3b9dbfdb56573d84fcbe36a240e7e13a656906b3f6c"
+content-hash = "c31f417cacd6c404399f6e062492bd89438d1fc713ad7802d6550eb422e6f7df"
 
 [metadata.files]
 asgiref = [

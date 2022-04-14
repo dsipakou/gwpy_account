@@ -11,3 +11,4 @@ class AccountList(ListCreateAPIView):
 class AccountDetails(RetrieveUpdateDestroyAPIView):
     queryset = Account.objects.all()
     serializer_class = AccountSerializer
+    lookup_field = "uuid"

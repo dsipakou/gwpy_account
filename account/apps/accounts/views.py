@@ -1,9 +1,13 @@
 from accounts.models import Account
 from accounts.serializers import AccountSerializer
-from django.shortcuts import render
-from rest_framework.generics import ListCreateAPIView
+from rest_framework.generics import ListCreateAPIView, RetrieveUpdateDestroyAPIView
 
 
 class AccountList(ListCreateAPIView):
+    queryset = Account.objects.all()
+    serializer_class = AccountSerializer
+
+
+class AccountDetails(RetrieveUpdateDestroyAPIView):
     queryset = Account.objects.all()
     serializer_class = AccountSerializer

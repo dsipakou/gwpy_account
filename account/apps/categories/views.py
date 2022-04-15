@@ -2,6 +2,7 @@ from rest_framework.exceptions import ValidationError
 from rest_framework.generics import ListCreateAPIView, RetrieveUpdateDestroyAPIView
 from categories.serializers import CategorySerializer
 from categories.models import Category
+from budget.models import Budget
 
 
 class CategoryList(ListCreateAPIView):
@@ -52,7 +53,9 @@ class CategoryDetails(RetrieveUpdateDestroyAPIView):
         super().perform_update(serializer)
 
     def perform_destroy(self, instance):
-        """Check if instance has childs
+        """Two checks:
+         - Check if instance has childs
+         - Check if instance has no correspoding budgets
 
         Raises:
             ValidationError: When instance has childs
@@ -60,4 +63,6 @@ class CategoryDetails(RetrieveUpdateDestroyAPIView):
 
         if Category.objects.filter(parent=instance).exists():
             raise ValidationError("Cannot delete non empty parent category")
+        if Budget.objects.filter(category=instance).exists():
+            raise ValidationError("Cannot delete category. There are budgets assigned")
         super().perform_destroy(instance)

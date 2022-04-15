@@ -1,8 +1,9 @@
-from rest_framework.exceptions import ValidationError
-from rest_framework.generics import ListCreateAPIView, RetrieveUpdateDestroyAPIView
-from categories.serializers import CategorySerializer
-from categories.models import Category
 from budget.models import Budget
+from categories.models import Category
+from categories.serializers import CategorySerializer
+from rest_framework.exceptions import ValidationError
+from rest_framework.generics import (ListCreateAPIView,
+                                     RetrieveUpdateDestroyAPIView)
 
 
 class CategoryList(ListCreateAPIView):
@@ -40,11 +41,11 @@ class CategoryDetails(RetrieveUpdateDestroyAPIView):
         """
 
         if (
-            serializer.validated_data["parent"]
+            serializer.validated_data.get("parent")
             and serializer.validated_data["parent"].parent is not None
         ):
             raise ValidationError("Child category cannot by parent category")
-        if serializer.validated_data["parent"] is not None:
+        if serializer.validated_data.get("parent") is not None:
             if Category.objects.filter(parent=serializer.instance).exists():
                 raise ValidationError(
                     "This category has childs. Cannot convert to child category"

@@ -1,6 +1,14 @@
-from django.contrib import admin
-from categories.models import Category
 from budget.models import Budget
+from categories.models import Category
+from django import forms
+from django.contrib import admin
+
+
+class CategoryFormAdmin(forms.ModelForm):
+    class Meta:
+        model = Category
+        fields = "__all__"
+        exclude = ("is_income",)
 
 
 class CategoryAdmin(admin.ModelAdmin):
@@ -13,6 +21,8 @@ class CategoryAdmin(admin.ModelAdmin):
         "created_at",
         "modified_at",
     )
+
+    form = CategoryFormAdmin
 
     def parent_name(self, obj):
         return obj.parent.name if obj.parent else None

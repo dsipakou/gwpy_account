@@ -1,9 +1,12 @@
-from django.contrib import admin
 from budget.models import Budget
+from django.contrib import admin
 
 
 class BudgetAdmin(admin.ModelAdmin):
-    pass
+    list_display = ("category_name", "amount", "created_at", "modified_at")
+
+    def category_name(self, obj):
+        return obj.category.name
 
 
 admin.site.register(Budget, BudgetAdmin)

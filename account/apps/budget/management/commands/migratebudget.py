@@ -8,19 +8,31 @@ from django.core.management.base import BaseCommand
 
 class Command(BaseCommand):
     def add_arguments(self, parser):
-        parser.add_argument("file_path", type=str)
+        parser.add_argument("budget_path", type=str)
+        parser.add_argument("category_path", type=str)
 
     def handle(self, *args, **kwars):
-        file_path = kwars["file_path"]
+        budget_path = kwars["budget_path"]
+        category_path = kwars["category_path"]
+
+        category_map = {}
+        with open(category_path) as file:
+            data = list(csv.reader(file, delimiter=","))
+            for row in data[1:]:
+                category_map[row[0]] = [row[1], row[2]]
 
         Budget.objects.all().delete()
 
-        with open(file_path) as file:
+        with open(budget_path) as file:
             data = list(csv.reader(file, delimiter=","))
             for row in data[1:]:
                 category = None
-                if row[9]:
-                    category = Category.objects.get(name=row[9])
+                if row[8]:
+                    category_item = category_map[row[8]]
+                    parent = None if not category_item[1] else category_item[1]
+                    category = Category.objects.get(
+                        name=category_item[0], parent=parent
+                    )
                 Budget.objects.create(
                     uuid=uuid.uuid4(),
                     category=category,

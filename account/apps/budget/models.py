@@ -7,7 +7,7 @@ from django.db.models import Q
 class Budget(models.Model):
     uuid = models.UUIDField(unique=True, default=uuid.uuid4, editable=False)
     category = models.ForeignKey(
-        "categories.Category", on_delete=models.CASCADE, to_field="uuid"
+        "categories.Category", on_delete=models.CASCADE, to_field="uuid", null=True
     )
     title = models.CharField(max_length=60)
     amount = models.IntegerField()

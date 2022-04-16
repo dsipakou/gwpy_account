@@ -1,5 +1,6 @@
 from currencies.models import Currency
 from django.contrib import admin
+from rates.models import Rate
 
 
 class CurrencyAdmin(admin.ModelAdmin):
@@ -7,6 +8,9 @@ class CurrencyAdmin(admin.ModelAdmin):
 
     def has_delete_permission(self, request, obj=None) -> bool:
         if obj and (obj.is_base or obj.is_default):
+            return False
+
+        if Rate.objects.filter(currency=obj).exists():
             return False
 
         return super().has_delete_permission(request, obj)

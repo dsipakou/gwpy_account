@@ -45,6 +45,7 @@ INSTALLED_APPS = [
     "categories",
     "currencies",
     "rates",
+    "transactions",
     "users",
 ]
 

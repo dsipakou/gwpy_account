@@ -1,9 +1,9 @@
-from django.core.management.base import BaseCommand
 import csv
-from currencies.models import Currency
-from rates.models import Rate
 import uuid
 
+from currencies.models import Currency
+from django.core.management.base import BaseCommand
+from rates.models import Rate
 
 CURRENCY_MAP = {2: "USD", 4: "EUR", 6: "RUB", 7: "PLN"}
 
@@ -14,6 +14,8 @@ class Command(BaseCommand):
 
     def handle(self, *args, **kwars):
         file_path = kwars["file_path"]
+
+        Rate.objects.all().delete()
 
         with open(file_path) as file:
             data = list(csv.reader(file, delimiter=","))

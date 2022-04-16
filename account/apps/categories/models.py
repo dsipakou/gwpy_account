@@ -6,7 +6,7 @@ from django.db.models import Q
 
 class Category(models.Model):
     uuid = models.UUIDField(unique=True, default=uuid.uuid4, editable=False)
-    name = models.CharField(max_length=30)
+    name = models.CharField(max_length=128)
     parent = models.ForeignKey(
         "self",
         related_name="categories",

@@ -25,6 +25,7 @@ class Command(BaseCommand):
                         is_income=False if row[6] == "false" else True,
                         created_at=row[3],
                         modified_at=row[4],
+                        orig_pk=row[0],
                     )
             for row in data[1:]:
                 if row[2]:
@@ -36,4 +37,5 @@ class Command(BaseCommand):
                         is_income=False if row[6] == "false" else True,
                         created_at=row[3],
                         modified_at=row[4],
+                        orig_pk=row[0],
                     )

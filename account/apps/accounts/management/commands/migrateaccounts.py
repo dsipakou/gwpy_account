@@ -24,7 +24,6 @@ class Command(BaseCommand):
 
         with open(file_path) as file:
             data = list(csv.reader(file, delimiter=","))
-            print(len(data))
             for row in data[1:]:
                 Account.objects.create(
                     uuid=uuid.uuid4(),
@@ -35,4 +34,5 @@ class Command(BaseCommand):
                     is_main=False if row[7] == "false" else True,
                     created_at=row[5],
                     modified_at=row[6],
+                    orig_pk=row[0],
                 )

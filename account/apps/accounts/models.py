@@ -12,6 +12,7 @@ class Account(models.Model):
     is_main = models.BooleanField(default=False)
     created_at = models.DateTimeField(auto_now_add=True)
     modified_at = models.DateTimeField(auto_now=True)
+    orig_pk = models.IntegerField()
 
     class Meta:
         unique_together = ["user", "source"]

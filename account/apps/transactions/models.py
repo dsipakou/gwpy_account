@@ -1,6 +1,7 @@
 import uuid
 
 from django.db import models
+from rates.models import Rate
 
 
 class Transaction(models.Model):
@@ -23,3 +24,10 @@ class Transaction(models.Model):
     transaction_date = models.DateField()
     created_at = models.DateTimeField(auto_now_add=True)
     modified_at = models.DateTimeField(auto_now=True)
+
+    @property
+    def spent_in_base_currency(self):
+        if self.currency.is_base:
+            return self.amount
+        rate = Rate.objects.get(currency=self.currency, rate_date=self.transaction_date)
+        return self.amount * rate.rate

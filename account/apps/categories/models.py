@@ -18,7 +18,6 @@ class Category(models.Model):
     is_income = models.BooleanField(default=False)
     created_at = models.DateTimeField(auto_now_add=True)
     modified_at = models.DateTimeField(auto_now=True)
-    orig_pk = models.IntegerField()
 
     class Meta:
         unique_together = ["name", "parent"]

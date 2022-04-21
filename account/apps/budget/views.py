@@ -1,11 +1,16 @@
 import datetime
 
 from budget.models import Budget
-from budget.serializers import BudgetSerializer, PlannedBudgetSerializer
+from budget.serializers import (ActualUsageBudgetSerializer, BudgetSerializer,
+                                PlannedBudgetSerializer)
+from django.db.models import Case, F, OuterRef, Value, When
+from django.forms import CharField
+from rates.models import Rate
 from rest_framework.exceptions import ValidationError
 from rest_framework.generics import (ListAPIView, ListCreateAPIView,
                                      RetrieveUpdateDestroyAPIView)
 from rest_framework.response import Response
+from transactions.models import Transaction
 
 
 class BudgetList(ListCreateAPIView):
@@ -58,4 +63,28 @@ class PlannedBudgetList(ListAPIView):
         )
 
         serializer = self.get_serializer(queryset, many=True)
+        return Response(serializer.data)
+
+
+class ActualUsageBudgetList(ListAPIView):
+    queryset = Transaction.objects.all()
+    serializer_class = ActualUsageBudgetSerializer
+
+    def list(self, request, *args, **kwargs):
+        dateFrom = request.GET.get(
+            "dateFrom", datetime.date.today() - datetime.timedelta(days=30)
+        )
+        dateTo = request.GET.get("dateTo", datetime.date.today())
+
+        curr = datetime.datetime.now()
+        transactions = (
+            self.get_queryset()
+            .filter(budget__budget_date__lte=dateTo, budget__budget_date__gte=dateFrom)
+            .select_related("budget", "currency")
+        )
+
+        print(datetime.datetime.now() - curr)
+
+        serializer = self.get_serializer(transactions, many=True)
+        print(datetime.datetime.now() - curr)
         return Response(serializer.data)

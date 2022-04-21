@@ -1,11 +1,10 @@
 import datetime
 
 from budget.models import Budget
-from budget.serializers import (ActualUsageBudgetSerializer, BudgetSerializer,
+from budget.serializers import (BudgetSerializer, CategoryBudgetSerializer,
                                 PlannedBudgetSerializer)
-from django.db.models import Case, F, OuterRef, Value, When
-from django.forms import CharField
-from rates.models import Rate
+from categories.models import Category
+from django.db.models import CharField, Count, OuterRef, Prefetch, Q
 from rest_framework.exceptions import ValidationError
 from rest_framework.generics import (ListAPIView, ListCreateAPIView,
                                      RetrieveUpdateDestroyAPIView)
@@ -68,7 +67,7 @@ class PlannedBudgetList(ListAPIView):
 
 class ActualUsageBudgetList(ListAPIView):
     queryset = Transaction.objects.all()
-    serializer_class = ActualUsageBudgetSerializer
+    serializer_class = CategoryBudgetSerializer
 
     def list(self, request, *args, **kwargs):
         dateFrom = request.GET.get(
@@ -76,11 +75,33 @@ class ActualUsageBudgetList(ListAPIView):
         )
         dateTo = request.GET.get("dateTo", datetime.date.today())
 
-        transactions = (
-            self.get_queryset()
-            .filter(budget__budget_date__lte=dateTo, budget__budget_date__gte=dateFrom)
-            .select_related("budget", "currency")
+        transactions = self.get_queryset().order_by("budget__title")
+
+        budgets = Budget.objects.filter(
+            budget_date__lte=dateTo, budget_date__gte=dateFrom
+        ).prefetch_related(
+            Prefetch(
+                "transaction_set", queryset=transactions, to_attr="budget_transactions"
+            ),
         )
 
-        serializer = self.get_serializer(transactions, many=True)
+        categories = (
+            Category.objects.filter()
+            .prefetch_related(
+                Prefetch("budget_set", queryset=budgets, to_attr="category_budgets")
+            )
+            .annotate(
+                budget_count=Count(
+                    "budget",
+                    filter=Q(
+                        budget__budget_date__lte=dateTo,
+                        budget__budget_date__gte=dateFrom,
+                    ),
+                ),
+            )
+            .filter(budget_count__gt=0)
+            .order_by("name")
+        )
+
+        serializer = self.get_serializer(categories, many=True)
         return Response(serializer.data)

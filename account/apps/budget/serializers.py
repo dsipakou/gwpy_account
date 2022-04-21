@@ -46,3 +46,32 @@ class ActualUsageBudgetSerializer(serializers.Serializer):
     created_at = serializers.DateTimeField(source="budget.created_at")
     spent_in_base_currency = serializers.FloatField()
     modified_at = serializers.DateTimeField(source="budget.modified_at")
+
+
+class TransactionSerializer(serializers.Serializer):
+    currency = serializers.UUIDField(source="currency.uuid")
+    currency_code = serializers.CharField(source="currency.code")
+    spent_in_original_currency = serializers.FloatField(source="amount")
+    spent_in_base_currency = serializers.FloatField()
+
+
+class BudgetUsageSerializer(serializers.Serializer):
+    uuid = serializers.UUIDField()
+    title = serializers.CharField()
+    planned = serializers.IntegerField(source="amount")
+    budget_date = serializers.DateField()
+    category = serializers.UUIDField(source="category.uuid")
+    category_name = serializers.CharField(source="category.name")
+    description = serializers.CharField()
+    is_completed = serializers.BooleanField()
+    description = serializers.CharField(allow_blank=True, allow_null=True)
+    budget_transactions = serializers.ListField(child=TransactionSerializer())
+    created_at = serializers.DateTimeField()
+    modified_at = serializers.DateTimeField()
+
+
+class CategoryBudgetSerializer(serializers.Serializer):
+    category = serializers.UUIDField(source="uuid")
+    category_name = serializers.CharField(source="name")
+    category_budgets = serializers.ListField(child=BudgetUsageSerializer())
+    budget_count = serializers.IntegerField()

@@ -1,3 +1,4 @@
+import uuid
 from budget.models import Budget
 from categories.serializers import CategorySerializer
 from rest_framework import serializers
@@ -67,6 +68,20 @@ class BudgetUsageSerializer(serializers.Serializer):
     transactions = serializers.ListField(child=TransactionSerializer())
     spent_in_original_currency = serializers.FloatField()
     spent_in_base_currency = serializers.FloatField()
+    created_at = serializers.DateTimeField()
+    modified_at = serializers.DateTimeField()
+
+
+class WeeklyBudgetUsageSerializer(serializers.Serializer):
+    uuid = serializers.UUIDField()
+    title = serializers.CharField()
+    budget_date = serializers.DateField()
+    planned = serializers.IntegerField(source="amount")
+    spent_in_original_currency = serializers.FloatField()
+    spent_in_base_currency = serializers.FloatField()
+    description = serializers.CharField(allow_blank=True, allow_null=True)
+    is_completed = serializers.BooleanField()
+    budget_transactions = serializers.ListField(child=TransactionSerializer())
     created_at = serializers.DateTimeField()
     modified_at = serializers.DateTimeField()
 

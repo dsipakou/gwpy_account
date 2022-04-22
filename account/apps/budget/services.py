@@ -14,14 +14,12 @@ class BudgetService:
     def load_budget(
         cls, date_from: datetime.date, date_to: datetime.date
     ) -> List[CategoryItem]:
-        transactions = Transaction.objects.all().order_by("budget__title")
-
         budgets = (
             Budget.objects.filter(budget_date__lte=date_to, budget_date__gte=date_from)
             .prefetch_related(
                 Prefetch(
                     "transaction_set",
-                    queryset=transactions,
+                    queryset=Transaction.objects.all(),
                     to_attr="budget_transactions",
                 ),
             )
@@ -46,13 +44,27 @@ class BudgetService:
             .order_by("name")
         )
 
+        print(categories.query)
+
         return cls.make_categories(categories)
+
+    @classmethod
+    def load_weekly_budget(cls, date_from, date_to) -> List[BudgetItem]:
+        budgets = Budget.objects.filter(budget_date__lte=date_to, budget_date__gte=date_from).prefetch_related(
+            Prefetch(
+                "transaction_set",
+                queryset=Transaction.objects.all(),
+                to_attr="budget_transactions",
+            ),
+        )
+
+        return cls.make_budgets(budgets)
 
     @classmethod
     def make_categories(cls, categories) -> List[CategoryItem]:
         categories_list = []
         for category in categories:
-            budgets = cls.make_budgets(category.category_budgets)
+            budgets = cls.make_grouped_budgets(category.category_budgets)
             spent_in_base_currency = sum(
                 item["spent_in_base_currency"] for item in budgets
             )
@@ -73,9 +85,38 @@ class BudgetService:
         return categories_list
 
     @classmethod
-    def make_budgets(cls, budgets) -> List[BudgetItem]:
+    def make_grouped_budgets(cls, budgets) -> List[BudgetGroupedItem]:
         budgets_list = []
         grouped_dict = {}
+        for budget in cls.make_budgets(budgets):
+            if budget["title"] not in grouped_dict:
+                grouped_dict[budget["title"]] = {
+                    "uuid": budget["uuid"],
+                    "title": budget["title"],
+                    "planned": budget["planned"],
+                    "spent_in_base_currency": budget["spent_in_base_currency"],
+                    "spent_in_original_currency": budget[
+                        "spent_in_original_currency"
+                    ],
+                    "items": [budget],
+                }
+            else:
+                grouped_dict[budget["title"]]["planned"] += budget["planned"]
+                grouped_dict[budget["title"]][
+                    "spent_in_base_currency"
+                ] += budget["spent_in_base_currency"]
+                grouped_dict[budget["title"]][
+                    "spent_in_original_currency"
+                ] += budget["spent_in_original_currency"]
+                grouped_dict[budget["title"]]["items"].append(budget)
+
+        for value in grouped_dict.values():
+            budgets_list.append(BudgetGroupedItem(**value))
+        return budgets_list
+
+    @classmethod
+    def make_budgets(cls, budgets) -> List[BudgetItem]:
+        budgets_list = []
         for budget in budgets:
             transactions = cls.make_transactions(budget.budget_transactions)
             spent_in_base_currency = 0
@@ -87,7 +128,7 @@ class BudgetService:
                 spent_in_original_currency = sum(
                     item["spent_in_original_currency"] for item in transactions
                 )
-            budget_item = BudgetItem(
+            budgets_list.append(BudgetItem(
                 uuid=budget.uuid,
                 category=budget.category.uuid,
                 title=budget.title,
@@ -100,30 +141,7 @@ class BudgetService:
                 spent_in_original_currency=spent_in_original_currency,
                 created_at=budget.created_at,
                 modified_at=budget.modified_at,
-            )
-            if budget_item["title"] not in grouped_dict:
-                grouped_dict[budget_item["title"]] = {
-                    "uuid": budget_item["uuid"],
-                    "title": budget_item["title"],
-                    "planned": budget_item["planned"],
-                    "spent_in_base_currency": budget_item["spent_in_base_currency"],
-                    "spent_in_original_currency": budget_item[
-                        "spent_in_original_currency"
-                    ],
-                    "items": [budget_item],
-                }
-            else:
-                grouped_dict[budget_item["title"]]["planned"] += budget_item["planned"]
-                grouped_dict[budget_item["title"]][
-                    "spent_in_base_currency"
-                ] += budget_item["spent_in_base_currency"]
-                grouped_dict[budget_item["title"]][
-                    "spent_in_original_currency"
-                ] += budget_item["spent_in_original_currency"]
-                grouped_dict[budget_item["title"]]["items"].append(budget_item)
-
-        for value in grouped_dict.values():
-            budgets_list.append(BudgetGroupedItem(**value))
+            ))
         return budgets_list
 
     @classmethod

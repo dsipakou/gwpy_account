@@ -1,15 +1,13 @@
 import datetime
 
-from budget.entities import BudgetTransactionItem
 from budget.models import Budget
 from budget.serializers import (BudgetSerializer, CategoryBudgetSerializer,
-                                PlannedBudgetSerializer)
+                                PlannedBudgetSerializer, BudgetUsageSerializer)
 from budget.services import BudgetService
 from rest_framework.exceptions import ValidationError
 from rest_framework.generics import (ListAPIView, ListCreateAPIView,
                                      RetrieveUpdateDestroyAPIView)
 from rest_framework.response import Response
-from transactions.models import Transaction
 
 
 class BudgetList(ListCreateAPIView):
@@ -66,7 +64,6 @@ class PlannedBudgetList(ListAPIView):
 
 
 class ActualUsageBudgetList(ListAPIView):
-    queryset = Transaction.objects.all()
     serializer_class = CategoryBudgetSerializer
 
     def list(self, request, *args, **kwargs):
@@ -75,7 +72,28 @@ class ActualUsageBudgetList(ListAPIView):
         )
         date_to = request.GET.get("dateTo", datetime.date.today())
 
+        start = datetime.datetime.now()
         categories = BudgetService.load_budget(date_from, date_to)
+        print(f"Month load speed {(datetime.datetime.now() - start)}")
 
         serializer = self.get_serializer(categories, many=True)
+        serializer.data
+        return Response(serializer.data)
+
+
+class WeeklyUsageList(ListAPIView):
+    serializer_class = BudgetUsageSerializer
+
+    def list(self, request, *args, **kwargs):
+        start = datetime.datetime.now()
+        date_from = request.GET.get(
+            "dateFrom", datetime.date.today() - datetime.timedelta(days=30)
+        )
+        date_to = request.GET.get("dateTo", datetime.date.today())
+
+        budgets = BudgetService.load_weekly_budget(date_from, date_to)
+
+        serializer = self.get_serializer(budgets, many=True)
+        serializer.data
+        print(f"Week load speed {(datetime.datetime.now() - start)}")
         return Response(serializer.data)

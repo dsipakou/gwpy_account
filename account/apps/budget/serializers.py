@@ -49,29 +49,32 @@ class ActualUsageBudgetSerializer(serializers.Serializer):
 
 
 class TransactionSerializer(serializers.Serializer):
-    currency = serializers.UUIDField(source="currency.uuid")
-    currency_code = serializers.CharField(source="currency.code")
-    spent_in_original_currency = serializers.FloatField(source="amount")
+    uuid = serializers.UUIDField()
+    currency = serializers.UUIDField()
+    currency_code = serializers.CharField()
+    spent_in_original_currency = serializers.FloatField()
     spent_in_base_currency = serializers.FloatField()
 
 
 class BudgetUsageSerializer(serializers.Serializer):
     uuid = serializers.UUIDField()
     title = serializers.CharField()
-    planned = serializers.IntegerField(source="amount")
+    planned = serializers.IntegerField()
     budget_date = serializers.DateField()
-    category = serializers.UUIDField(source="category.uuid")
-    category_name = serializers.CharField(source="category.name")
-    description = serializers.CharField()
+    category = serializers.UUIDField()
     is_completed = serializers.BooleanField()
     description = serializers.CharField(allow_blank=True, allow_null=True)
-    budget_transactions = serializers.ListField(child=TransactionSerializer())
+    transactions = serializers.ListField(child=TransactionSerializer())
+    spent_in_original_currency = serializers.FloatField()
+    spent_in_base_currency = serializers.FloatField()
     created_at = serializers.DateTimeField()
     modified_at = serializers.DateTimeField()
 
 
 class CategoryBudgetSerializer(serializers.Serializer):
-    category = serializers.UUIDField(source="uuid")
-    category_name = serializers.CharField(source="name")
-    category_budgets = serializers.ListField(child=BudgetUsageSerializer())
-    budget_count = serializers.IntegerField()
+    uuid = serializers.UUIDField()
+    category_name = serializers.CharField()
+    budgets = serializers.ListField(child=BudgetUsageSerializer())
+    planned = serializers.FloatField()
+    spent_in_original_currency = serializers.FloatField()
+    spent_in_base_currency = serializers.FloatField()

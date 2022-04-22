@@ -71,10 +71,19 @@ class BudgetUsageSerializer(serializers.Serializer):
     modified_at = serializers.DateTimeField()
 
 
+class BudgetGroupedUsageSerializer(serializers.Serializer):
+    uuid = serializers.UUIDField()
+    title = serializers.CharField()
+    planned = serializers.IntegerField()
+    spent_in_original_currency = serializers.FloatField()
+    spent_in_base_currency = serializers.FloatField()
+    items = serializers.ListField(child=BudgetUsageSerializer())
+
+
 class CategoryBudgetSerializer(serializers.Serializer):
     uuid = serializers.UUIDField()
     category_name = serializers.CharField()
-    budgets = serializers.ListField(child=BudgetUsageSerializer())
+    budgets = serializers.ListField(child=BudgetGroupedUsageSerializer())
     planned = serializers.FloatField()
     spent_in_original_currency = serializers.FloatField()
     spent_in_base_currency = serializers.FloatField()

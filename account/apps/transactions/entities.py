@@ -1,5 +1,5 @@
 import datetime
-from typing import TypedDict
+from typing import List, TypedDict
 from uuid import UUID
 
 
@@ -13,6 +13,12 @@ class TransactionAccountDetails(TypedDict):
     source: str
 
 
+class TransactionSpentInCurrencyDetails(TypedDict):
+    amount: float
+    sign: str
+    currency: UUID
+
+
 class TransactionItem(TypedDict):
     uuid: UUID
     user: UUID
@@ -22,6 +28,7 @@ class TransactionItem(TypedDict):
     currency: UUID
     amount: float
     spent_in_base_currency: float
+    spent_in_currency_list: List[TransactionSpentInCurrencyDetails]
     account: UUID
     account_details: TransactionAccountDetails
     description: str

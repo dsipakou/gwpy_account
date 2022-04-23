@@ -29,5 +29,13 @@ class Transaction(models.Model):
     def spent_in_base_currency(self):
         if self.currency.is_base:
             return self.amount
-        rate = Rate.objects.get(currency=self.currency, rate_date=self.transaction_date)
+        rate = self.to_date_rates.get(
+            currency=self.currency, rate_date=self.transaction_date
+        )
         return self.amount * rate.rate
+
+    @property
+    def to_date_rates(self):
+        return Rate.objects.filter(rate_date=self.transaction_date).select_related(
+            "currency"
+        )

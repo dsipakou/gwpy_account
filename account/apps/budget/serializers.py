@@ -1,4 +1,5 @@
 import uuid
+
 from budget.models import Budget
 from categories.serializers import CategorySerializer
 from rest_framework import serializers

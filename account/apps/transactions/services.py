@@ -1,0 +1,55 @@
+from typing import List, Optional
+
+from transactions.entities import (TransactionAccountDetails,
+                                   TransactionCategoryDetails, TransactionItem)
+from transactions.models import Transaction
+
+
+class TransactionService:
+    @classmethod
+    def load_transactions(
+        cls,
+        *,
+        limit: Optional[int] = None,
+        date_from: Optional[str] = None,
+        date_to: Optional[str] = None,
+        order_by: Optional[str] = "created_at",
+    ) -> List[TransactionItem]:
+        transactions = []
+        qs = (
+            Transaction.objects.all()
+            .order_by(f"-{order_by}")
+            .select_related("category", "account")
+        )
+        if limit:
+            qs = transactions[:limit]
+
+        for transaction in qs:
+            category_details = TransactionCategoryDetails(
+                name=transaction.category.name,
+                parent=transaction.category.parent.uuid,
+                parent_name=transaction.category.parent.name,
+            )
+
+            account_details = TransactionAccountDetails(
+                source=transaction.account.source,
+            )
+            transactions.append(
+                TransactionItem(
+                    uuid=transaction.uuid,
+                    user=transaction.user,
+                    category=transaction.category.uuid,
+                    category_details=category_details,
+                    budget=transaction.budget,
+                    currency=transaction.currency,
+                    amount=transaction.amount,
+                    spent_in_base_currency=transaction.spent_in_base_currency,
+                    account=transaction.account.uuid,
+                    account_details=account_details,
+                    description=transaction.description,
+                    transaction_date=transaction.transaction_date,
+                    created_at=transaction.created_at,
+                    modified_at=transaction.modified_at,
+                )
+            )
+        return transactions

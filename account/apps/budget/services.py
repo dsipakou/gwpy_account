@@ -50,7 +50,9 @@ class BudgetService:
 
     @classmethod
     def load_weekly_budget(cls, date_from, date_to) -> List[BudgetItem]:
-        budgets = Budget.objects.filter(budget_date__lte=date_to, budget_date__gte=date_from).prefetch_related(
+        budgets = Budget.objects.filter(
+            budget_date__lte=date_to, budget_date__gte=date_from
+        ).prefetch_related(
             Prefetch(
                 "transaction_set",
                 queryset=Transaction.objects.all(),
@@ -95,19 +97,17 @@ class BudgetService:
                     "title": budget["title"],
                     "planned": budget["planned"],
                     "spent_in_base_currency": budget["spent_in_base_currency"],
-                    "spent_in_original_currency": budget[
-                        "spent_in_original_currency"
-                    ],
+                    "spent_in_original_currency": budget["spent_in_original_currency"],
                     "items": [budget],
                 }
             else:
                 grouped_dict[budget["title"]]["planned"] += budget["planned"]
-                grouped_dict[budget["title"]][
+                grouped_dict[budget["title"]]["spent_in_base_currency"] += budget[
                     "spent_in_base_currency"
-                ] += budget["spent_in_base_currency"]
-                grouped_dict[budget["title"]][
+                ]
+                grouped_dict[budget["title"]]["spent_in_original_currency"] += budget[
                     "spent_in_original_currency"
-                ] += budget["spent_in_original_currency"]
+                ]
                 grouped_dict[budget["title"]]["items"].append(budget)
 
         for value in grouped_dict.values():
@@ -128,20 +128,22 @@ class BudgetService:
                 spent_in_original_currency = sum(
                     item["spent_in_original_currency"] for item in transactions
                 )
-            budgets_list.append(BudgetItem(
-                uuid=budget.uuid,
-                category=budget.category.uuid,
-                title=budget.title,
-                budget_date=budget.budget_date,
-                transactions=transactions,
-                description=budget.description,
-                is_completed=budget.is_completed,
-                planned=budget.amount,
-                spent_in_base_currency=spent_in_base_currency,
-                spent_in_original_currency=spent_in_original_currency,
-                created_at=budget.created_at,
-                modified_at=budget.modified_at,
-            ))
+            budgets_list.append(
+                BudgetItem(
+                    uuid=budget.uuid,
+                    category=budget.category.uuid,
+                    title=budget.title,
+                    budget_date=budget.budget_date,
+                    transactions=transactions,
+                    description=budget.description,
+                    is_completed=budget.is_completed,
+                    planned=budget.amount,
+                    spent_in_base_currency=spent_in_base_currency,
+                    spent_in_original_currency=spent_in_original_currency,
+                    created_at=budget.created_at,
+                    modified_at=budget.modified_at,
+                )
+            )
         return budgets_list
 
     @classmethod

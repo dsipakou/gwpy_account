@@ -44,8 +44,6 @@ class BudgetService:
             .order_by("name")
         )
 
-        print(categories.query)
-
         return cls.make_categories(categories)
 
     @classmethod

@@ -8,6 +8,48 @@ from transactions.models import Transaction
 
 class TransactionService:
     @classmethod
+    def get_transaction(cls, transaction: Transaction) -> Optional[Transaction]:
+        category_details = TransactionCategoryDetails(
+            name=transaction.category.name,
+            parent=transaction.category.parent.uuid,
+            parent_name=transaction.category.parent.name,
+        )
+        account_details = TransactionAccountDetails(
+            source=transaction.account.source,
+        )
+        spent_details = [
+            TransactionSpentInCurrencyDetails(
+                amount=transaction.amount * rate.rate,
+                sign=rate.currency.sign,
+                currency=rate.currency.uuid,
+            )
+            for rate in transaction.to_date_rates
+        ]
+
+        return TransactionItem(
+            uuid=transaction.uuid,
+            user=transaction.user,
+            category=transaction.category.uuid,
+            category_details=category_details,
+            budget=transaction.budget,
+            currency=transaction.currency.uuid,
+            amount=transaction.amount,
+            spent_in_base_currency=transaction.spent_in_base_currency,
+            spent_in_currency_list=spent_details,
+            account=transaction.account.uuid,
+            account_details=account_details,
+            description=transaction.description,
+            transaction_date=transaction.transaction_date,
+            created_at=transaction.created_at,
+            modified_at=transaction.modified_at,
+        )
+
+    @classmethod
+    def load_transaction(cls, transaction_uuid: str) -> TransactionItem:
+        transaction = Transaction.objects.get(uuid=transaction_uuid)
+        return cls.get_transaction(transaction)
+
+    @classmethod
     def load_transactions(
         cls,
         *,
@@ -24,41 +66,5 @@ class TransactionService:
         )
 
         for transaction in qs:
-            print(transaction.category.name)
-            category_details = TransactionCategoryDetails(
-                name=transaction.category.name,
-                parent=transaction.category.parent.uuid,
-                parent_name=transaction.category.parent.name,
-            )
-            account_details = TransactionAccountDetails(
-                source=transaction.account.source,
-            )
-            spent_details = [
-                TransactionSpentInCurrencyDetails(
-                    amount=transaction.amount * rate.rate,
-                    sign=rate.currency.sign,
-                    currency=rate.currency.uuid,
-                )
-                for rate in transaction.to_date_rates
-            ]
-
-            transactions.append(
-                TransactionItem(
-                    uuid=transaction.uuid,
-                    user=transaction.user,
-                    category=transaction.category.uuid,
-                    category_details=category_details,
-                    budget=transaction.budget,
-                    currency=transaction.currency,
-                    amount=transaction.amount,
-                    spent_in_base_currency=transaction.spent_in_base_currency,
-                    spent_in_currency_list=spent_details,
-                    account=transaction.account.uuid,
-                    account_details=account_details,
-                    description=transaction.description,
-                    transaction_date=transaction.transaction_date,
-                    created_at=transaction.created_at,
-                    modified_at=transaction.modified_at,
-                )
-            )
+            transactions.append(cls.get_transaction(transaction))
         return transactions

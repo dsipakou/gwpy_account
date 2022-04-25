@@ -1,5 +1,6 @@
 import uuid
 
+from currencies.models import Currency
 from django.db import models
 from rates.models import Rate
 
@@ -13,9 +14,7 @@ class Transaction(models.Model):
     budget = models.ForeignKey(
         "budget.Budget", on_delete=models.CASCADE, to_field="uuid", null=True
     )
-    currency = models.ForeignKey(
-        "currencies.Currency", on_delete=models.CASCADE, to_field="uuid"
-    )
+    currency = models.ForeignKey(Currency, on_delete=models.CASCADE, to_field="uuid")
     amount = models.FloatField()
     account = models.ForeignKey(
         "accounts.Account", on_delete=models.CASCADE, to_field="uuid"

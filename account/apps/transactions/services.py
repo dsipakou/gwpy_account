@@ -28,7 +28,7 @@ class TransactionService:
 
         return TransactionItem(
             uuid=transaction.uuid,
-            user=transaction.user,
+            user=transaction.user.uuid,
             category=transaction.category.uuid,
             category_details=category_details,
             budget=transaction.budget,

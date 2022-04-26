@@ -16,4 +16,4 @@ class Budget(models.Model):
     is_completed = models.BooleanField(default=False)
     created_at = models.DateTimeField(auto_now_add=True)
     modified_at = models.DateTimeField(auto_now=True)
-    orig_pk = models.IntegerField()
+    orig_pk = models.IntegerField(null=True)

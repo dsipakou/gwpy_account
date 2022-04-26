@@ -1,8 +1,11 @@
 from typing import List, Optional
 
-from transactions.entities import (TransactionAccountDetails,
-                                   TransactionCategoryDetails, TransactionItem,
-                                   TransactionSpentInCurrencyDetails)
+from transactions.entities import (
+    TransactionAccountDetails,
+    TransactionCategoryDetails,
+    TransactionItem,
+    TransactionSpentInCurrencyDetails,
+)
 from transactions.models import Transaction
 
 

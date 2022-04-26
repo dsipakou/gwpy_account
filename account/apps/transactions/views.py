@@ -1,10 +1,8 @@
 from rest_framework import status
-from rest_framework.generics import (ListCreateAPIView,
-                                     RetrieveUpdateDestroyAPIView)
+from rest_framework.generics import ListCreateAPIView, RetrieveUpdateDestroyAPIView
 from rest_framework.response import Response
 from transactions.models import Transaction
-from transactions.serializers import (TransactionCreateSerializer,
-                                      TransactionSerializer)
+from transactions.serializers import TransactionCreateSerializer, TransactionSerializer
 from transactions.services import TransactionService
 
 

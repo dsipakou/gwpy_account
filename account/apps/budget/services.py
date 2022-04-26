@@ -1,8 +1,12 @@
 import datetime
 from typing import List
 
-from budget.entities import (BudgetGroupedItem, BudgetItem,
-                             BudgetTransactionItem, CategoryItem)
+from budget.entities import (
+    BudgetGroupedItem,
+    BudgetItem,
+    BudgetTransactionItem,
+    CategoryItem,
+)
 from budget.models import Budget
 from categories.models import Category
 from django.db.models import Count, Prefetch, Q

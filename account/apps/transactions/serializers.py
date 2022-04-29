@@ -52,3 +52,21 @@ class TransactionCreateSerializer(serializers.ModelSerializer):
             "description",
             "transaction_date",
         )
+
+
+class TransactionDetailsSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = Transaction
+        fields = (
+            "uuid",
+            "user",
+            "category",
+            "budget",
+            "currency",
+            "amount",
+            "account",
+            "description",
+            "transaction_date",
+            "created_at",
+            "modified_at",
+        )

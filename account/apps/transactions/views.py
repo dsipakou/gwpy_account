@@ -2,7 +2,11 @@ from rest_framework import status
 from rest_framework.generics import ListCreateAPIView, RetrieveUpdateDestroyAPIView
 from rest_framework.response import Response
 from transactions.models import Transaction
-from transactions.serializers import TransactionCreateSerializer, TransactionSerializer
+from transactions.serializers import (
+    TransactionCreateSerializer,
+    TransactionDetailsSerializer,
+    TransactionSerializer,
+)
 from transactions.services import TransactionService
 
 
@@ -30,5 +34,8 @@ class TransactionList(ListCreateAPIView):
 
 class TransactionDetails(RetrieveUpdateDestroyAPIView):
     queryset = Transaction.objects.all()
-    serializer_class = TransactionSerializer
+    serializer_class = TransactionDetailsSerializer
     lookup_field = "uuid"
+
+    def update(self, request, *args, **kwargs):
+        return super().update(request, *args, **kwargs)

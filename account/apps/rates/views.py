@@ -1,6 +1,8 @@
 import datetime
 
 from currencies.models import Currency
+from html5lib import serialize
+from rates.filters import DateFilter
 from rates.models import Rate
 from rates.serializers import (
     RateChartDataSerializer,
@@ -19,6 +21,12 @@ from rest_framework.response import Response
 class RateList(ListCreateAPIView):
     queryset = Rate.objects.order_by("rate_date").reverse()[:180]
     serializer_class = RateSerializer
+
+
+class RateDayData(ListAPIView):
+    queryset = Rate.objects.all()
+    serializer_class = RateSerializer
+    filter_backends = (DateFilter,)
 
 
 class RateDetails(RetrieveUpdateDestroyAPIView):

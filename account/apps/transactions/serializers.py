@@ -39,6 +39,11 @@ class TransactionSerializer(serializers.Serializer):
     modified_at = serializers.DateTimeField(read_only=True)
 
 
+class GroupedTransactionSerializer(serializers.Serializer):
+    category_name = serializers.CharField()
+    items = serializers.ListField(child=TransactionSerializer())
+
+
 class TransactionCreateSerializer(serializers.ModelSerializer):
     class Meta:
         model = Transaction

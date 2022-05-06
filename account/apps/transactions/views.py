@@ -1,12 +1,14 @@
+import datetime
+
 from rest_framework import status
-from rest_framework.generics import ListCreateAPIView, RetrieveUpdateDestroyAPIView
+from rest_framework.generics import (ListAPIView, ListCreateAPIView,
+                                     RetrieveUpdateDestroyAPIView)
 from rest_framework.response import Response
 from transactions.models import Transaction
-from transactions.serializers import (
-    TransactionCreateSerializer,
-    TransactionDetailsSerializer,
-    TransactionSerializer,
-)
+from transactions.serializers import (GroupedTransactionSerializer,
+                                      TransactionCreateSerializer,
+                                      TransactionDetailsSerializer,
+                                      TransactionSerializer)
 from transactions.services import TransactionService
 
 
@@ -39,3 +41,19 @@ class TransactionDetails(RetrieveUpdateDestroyAPIView):
 
     def update(self, request, *args, **kwargs):
         return super().update(request, *args, **kwargs)
+
+
+class TransactionGroupedList(ListAPIView):
+    serializer_class = GroupedTransactionSerializer
+
+    def list(self, request, *args, **kwargs):
+        date_from = request.GET.get(
+            "dateFrom", datetime.date.today() - datetime.timedelta(days=30)
+        )
+        date_to = request.GET.get("dateTo", datetime.date.today())
+        transactions = TransactionService.load_grouped_transactions(
+            date_from=date_from, date_to=date_to
+        )
+
+        serializer = self.get_serializer(transactions, many=True)
+        return Response(serializer.data)

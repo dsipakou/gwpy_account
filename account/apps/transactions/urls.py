@@ -6,4 +6,9 @@ urlpatterns = [
     path(
         "<uuid:uuid>/", views.TransactionDetails.as_view(), name="transaction_details"
     ),
+    path(
+        "grouped/",
+        views.TransactionGroupedList.as_view(),
+        name="transaction_grouped_list",
+    ),
 ]

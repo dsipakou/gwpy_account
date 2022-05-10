@@ -1,9 +1,7 @@
+import copy
 from typing import List, Optional
-from unicodedata import category
 
-from transactions.entities import (GroupedByParent,
-                                   GroupedByCategory,
-                                   TransactionAccountDetails,
+from transactions.entities import (GroupedByParent, TransactionAccountDetails,
                                    TransactionCategoryDetails, TransactionItem,
                                    TransactionSpentInCurrencyDetails)
 from transactions.models import Transaction
@@ -20,14 +18,14 @@ class TransactionService:
         account_details = TransactionAccountDetails(
             source=transaction.account.source,
         )
-        spent_details = [
-            TransactionSpentInCurrencyDetails(
-                amount=transaction.amount * rate.rate,
+        spent_details = {
+            rate.currency.code: TransactionSpentInCurrencyDetails(
+                amount=round(transaction.amount / rate.rate, 6),
                 sign=rate.currency.sign,
                 currency=rate.currency.uuid,
             )
             for rate in transaction.to_date_rates
-        ]
+        }
 
         return TransactionItem(
             uuid=transaction.uuid,
@@ -38,7 +36,7 @@ class TransactionService:
             currency=transaction.currency.uuid,
             amount=transaction.amount,
             spent_in_base_currency=transaction.spent_in_base_currency,
-            spent_in_currency_list=spent_details,
+            spent_in_currencies=spent_details,
             account=transaction.account.uuid,
             account_details=account_details,
             description=transaction.description,
@@ -89,15 +87,43 @@ class TransactionService:
             transaction_details: TransactionItem = cls.get_transaction(transaction)
             category_name = transaction_details["category_details"]["name"]
             parent_name = transaction_details["category_details"]["parent_name"]
-            grouped_by_parent[parent_name] = grouped_by_parent.get(
-                parent_name, []
-            )
-            grouped_by_category[category_name] = grouped_by_category.get(
-                category_name, {'name': category_name, 'parent': parent_name, 'spent_in_base_currency': 0, 'items': []}
-            )
+            grouped_by_parent[parent_name] = grouped_by_parent.get(parent_name, [])
+            if category_name not in grouped_by_category:
+                grouped_by_category[category_name] = {
+                    "name": category_name,
+                    "parent": parent_name,
+                    "spent_in_base_currency": transaction_details[
+                        "spent_in_base_currency"
+                    ],
+                    "spent_in_currencies": copy.deepcopy(
+                        transaction_details["spent_in_currencies"]
+                    ),
+                    "items": [],
+                }
+                grouped_by_category[category_name]["items"].append(transaction_details)
+                grouped_by_parent[parent_name].append(transaction_details)
+                continue
+
             grouped_by_parent[parent_name].append(transaction_details)
-            grouped_by_category[category_name]['items'].append(transaction_details)
-            grouped_by_category[category_name]['spent_in_base_currency'] = round(grouped_by_category[category_name]['spent_in_base_currency'] + transaction_details['spent_in_base_currency'], 5)
+            grouped_by_category[category_name]["items"].append(transaction_details)
+
+            grouped_by_category[category_name]["spent_in_base_currency"] = round(
+                grouped_by_category[category_name]["spent_in_base_currency"]
+                + transaction_details["spent_in_base_currency"],
+                5,
+            )
+
+            for currency, value in grouped_by_category[category_name][
+                "spent_in_currencies"
+            ].items():
+                grouped_by_category[category_name]["spent_in_currencies"][currency][
+                    "amount"
+                ] = round(
+                    value["amount"]
+                    + transaction_details["spent_in_currencies"][currency]["amount"],
+                    6,
+                )
+
         for key in sorted(grouped_by_parent.keys()):
             transactions.append(
                 GroupedByParent(category_name=key, items=grouped_by_parent[key])

@@ -37,6 +37,11 @@ class TransactionItem(TypedDict):
     modified_at: datetime.datetime
 
 
-class GroupedTransaction(TypedDict):
+class GroupedByCategory(TypedDict):
     category_name: str
     items: List[TransactionItem]
+
+class GroupedByParent(TypedDict):
+    category_name: str
+    items: List[TransactionItem]
+

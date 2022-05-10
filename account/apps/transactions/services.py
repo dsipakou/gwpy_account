@@ -1,6 +1,8 @@
 from typing import List, Optional
+from unicodedata import category
 
-from transactions.entities import (GroupedTransaction,
+from transactions.entities import (GroupedByParent,
+                                   GroupedByCategory,
                                    TransactionAccountDetails,
                                    TransactionCategoryDetails, TransactionItem,
                                    TransactionSpentInCurrencyDetails)
@@ -73,8 +75,9 @@ class TransactionService:
     @classmethod
     def load_grouped_transactions(
         cls, *, date_from: Optional[str] = None, date_to: Optional[str] = None
-    ) -> List[GroupedTransaction]:
-        grouped_transactions = {}
+    ) -> List[GroupedByParent]:
+        grouped_by_parent = {}
+        grouped_by_category = {}
         transactions = []
         qs = Transaction.objects.all().order_by("-created_at")
         if date_from:
@@ -84,13 +87,19 @@ class TransactionService:
 
         for transaction in qs:
             transaction_details: TransactionItem = cls.get_transaction(transaction)
+            category_name = transaction_details["category_details"]["name"]
             parent_name = transaction_details["category_details"]["parent_name"]
-            grouped_transactions[parent_name] = grouped_transactions.get(
+            grouped_by_parent[parent_name] = grouped_by_parent.get(
                 parent_name, []
             )
-            grouped_transactions[parent_name].append(transaction_details)
-        for key in sorted(grouped_transactions.keys()):
+            grouped_by_category[category_name] = grouped_by_category.get(
+                category_name, {'name': category_name, 'parent': parent_name, 'spent_in_base_currency': 0, 'items': []}
+            )
+            grouped_by_parent[parent_name].append(transaction_details)
+            grouped_by_category[category_name]['items'].append(transaction_details)
+            grouped_by_category[category_name]['spent_in_base_currency'] = round(grouped_by_category[category_name]['spent_in_base_currency'] + transaction_details['spent_in_base_currency'], 5)
+        for key in sorted(grouped_by_parent.keys()):
             transactions.append(
-                GroupedTransaction(category_name=key, items=grouped_transactions[key])
+                GroupedByParent(category_name=key, items=grouped_by_parent[key])
             )
         return transactions

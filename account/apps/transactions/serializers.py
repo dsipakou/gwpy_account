@@ -37,9 +37,17 @@ class TransactionSerializer(serializers.Serializer):
     modified_at = serializers.DateTimeField(read_only=True)
 
 
+class GroupedByCategorySerializer(serializers.Serializer):
+    category_name = serializers.CharField()
+    parent_name = serializers.CharField()
+    spent_in_base_currency = serializers.FloatField()
+    spent_in_currencies = serializers.DictField(read_only=True)
+    items = serializers.ListField(child=TransactionSerializer())
+
+
 class GroupedTransactionSerializer(serializers.Serializer):
     category_name = serializers.CharField()
-    items = serializers.ListField(child=TransactionSerializer())
+    items = serializers.ListField(child=GroupedByCategorySerializer())
 
 
 class TransactionCreateSerializer(serializers.ModelSerializer):

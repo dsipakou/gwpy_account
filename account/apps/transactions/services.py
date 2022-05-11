@@ -1,10 +1,14 @@
 import copy
-from typing import List, Optional
+from typing import TYPE_CHECKING, List, Optional
 
-from transactions.entities import (GroupedByParent, TransactionAccountDetails,
+from django.db.models import QuerySet
+from transactions.entities import (GroupedByCategory, GroupedByParent,
+                                   TransactionAccountDetails,
                                    TransactionCategoryDetails, TransactionItem,
                                    TransactionSpentInCurrencyDetails)
 from transactions.models import Transaction
+
+AMOUNT_ACCURACY = 6
 
 
 class TransactionService:
@@ -20,7 +24,7 @@ class TransactionService:
         )
         spent_details = {
             rate.currency.code: TransactionSpentInCurrencyDetails(
-                amount=round(transaction.amount / rate.rate, 6),
+                amount=round(transaction.amount / rate.rate, AMOUNT_ACCURACY),
                 sign=rate.currency.sign,
                 currency=rate.currency.uuid,
             )
@@ -44,6 +48,47 @@ class TransactionService:
             created_at=transaction.created_at,
             modified_at=transaction.modified_at,
         )
+
+    @classmethod
+    def group_by_category(cls, transactions: QuerySet) -> GroupedByCategory:
+        grouped_by_category = {}
+        for transaction in transactions:
+            transaction_details: TransactionItem = cls.get_transaction(transaction)
+            category_name = transaction_details["category_details"]["name"]
+            parent_name = transaction_details["category_details"]["parent_name"]
+            if category_name not in grouped_by_category:
+                grouped_by_category[category_name] = GroupedByCategory(
+                    category_name=category_name,
+                    parent_name=parent_name,
+                    spent_in_base_currency=transaction_details[
+                        "spent_in_base_currency"
+                    ],
+                    spent_in_currencies=copy.deepcopy(
+                        transaction_details["spent_in_currencies"]
+                    ),
+                    items=[transaction_details],
+                )
+                continue
+
+            grouped_by_category[category_name]["items"].append(transaction_details)
+
+            grouped_by_category[category_name]["spent_in_base_currency"] = round(
+                grouped_by_category[category_name]["spent_in_base_currency"]
+                + transaction_details["spent_in_base_currency"],
+                AMOUNT_ACCURACY,
+            )
+
+            for currency, value in grouped_by_category[category_name][
+                "spent_in_currencies"
+            ].items():
+                grouped_by_category[category_name]["spent_in_currencies"][currency][
+                    "amount"
+                ] = round(
+                    value["amount"]
+                    + transaction_details["spent_in_currencies"][currency]["amount"],
+                    AMOUNT_ACCURACY,
+                )
+        return grouped_by_category
 
     @classmethod
     def load_transaction(cls, transaction_uuid: str) -> TransactionItem:
@@ -74,7 +119,7 @@ class TransactionService:
     def load_grouped_transactions(
         cls, *, date_from: Optional[str] = None, date_to: Optional[str] = None
     ) -> List[GroupedByParent]:
-        grouped_by_parent = {}
+
         grouped_by_category = {}
         transactions = []
         qs = Transaction.objects.all().order_by("-created_at")
@@ -83,46 +128,16 @@ class TransactionService:
         if date_to:
             qs = qs.filter(transaction_date__lte=date_to)
 
-        for transaction in qs:
-            transaction_details: TransactionItem = cls.get_transaction(transaction)
-            category_name = transaction_details["category_details"]["name"]
-            parent_name = transaction_details["category_details"]["parent_name"]
-            grouped_by_parent[parent_name] = grouped_by_parent.get(parent_name, [])
-            if category_name not in grouped_by_category:
-                grouped_by_category[category_name] = {
-                    "name": category_name,
-                    "parent": parent_name,
-                    "spent_in_base_currency": transaction_details[
-                        "spent_in_base_currency"
-                    ],
-                    "spent_in_currencies": copy.deepcopy(
-                        transaction_details["spent_in_currencies"]
-                    ),
-                    "items": [],
-                }
-                grouped_by_category[category_name]["items"].append(transaction_details)
-                grouped_by_parent[parent_name].append(transaction_details)
-                continue
+        grouped_by_parent = {}
+        grouped_by_category = cls.group_by_category(qs)
 
-            grouped_by_parent[parent_name].append(transaction_details)
-            grouped_by_category[category_name]["items"].append(transaction_details)
-
-            grouped_by_category[category_name]["spent_in_base_currency"] = round(
-                grouped_by_category[category_name]["spent_in_base_currency"]
-                + transaction_details["spent_in_base_currency"],
-                5,
+        for category in sorted(grouped_by_category.keys()):
+            grouped_by_parent[
+                grouped_by_category[category]["parent_name"]
+            ] = grouped_by_parent.get(grouped_by_category[category]["parent_name"], [])
+            grouped_by_parent[grouped_by_category[category]["parent_name"]].append(
+                grouped_by_category[category]
             )
-
-            for currency, value in grouped_by_category[category_name][
-                "spent_in_currencies"
-            ].items():
-                grouped_by_category[category_name]["spent_in_currencies"][currency][
-                    "amount"
-                ] = round(
-                    value["amount"]
-                    + transaction_details["spent_in_currencies"][currency]["amount"],
-                    6,
-                )
 
         for key in sorted(grouped_by_parent.keys()):
             transactions.append(

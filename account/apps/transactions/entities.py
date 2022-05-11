@@ -47,4 +47,6 @@ class GroupedByCategory(TypedDict):
 
 class GroupedByParent(TypedDict):
     category_name: str
+    spent_in_base_currency: float
+    spent_in_currencies: Dict[str, TransactionSpentInCurrencyDetails]
     items: List[GroupedByCategory]

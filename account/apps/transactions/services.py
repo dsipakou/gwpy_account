@@ -1,5 +1,5 @@
 import copy
-from typing import TYPE_CHECKING, List, Optional
+from typing import Dict, List, Optional
 
 from django.db.models import QuerySet
 from transactions.entities import (GroupedByCategory, GroupedByParent,
@@ -24,7 +24,9 @@ class TransactionService:
         )
         spent_details = {
             rate.currency.code: TransactionSpentInCurrencyDetails(
-                amount=round(transaction.amount / rate.rate, AMOUNT_ACCURACY),
+                amount=round(
+                    transaction.spent_in_base_currency / rate.rate, AMOUNT_ACCURACY
+                ),
                 sign=rate.currency.sign,
                 currency=rate.currency.uuid,
             )
@@ -91,6 +93,42 @@ class TransactionService:
         return grouped_by_category
 
     @classmethod
+    def group_by_parent(
+        cls, grouped_by_category: Dict[str, GroupedByCategory]
+    ) -> GroupedByParent:
+        grouped_by_parent = {}
+        for category in grouped_by_category.values():
+            parent_name = category["parent_name"]
+            if parent_name not in grouped_by_parent:
+                grouped_by_parent[parent_name] = GroupedByParent(
+                    category_name=parent_name,
+                    spent_in_base_currency=category["spent_in_base_currency"],
+                    spent_in_currencies=copy.deepcopy(category["spent_in_currencies"]),
+                    items=[category],
+                )
+                continue
+
+            grouped_by_parent[parent_name]["items"].append(category)
+
+            grouped_by_parent[parent_name]["spent_in_base_currency"] = round(
+                grouped_by_parent[parent_name]["spent_in_base_currency"]
+                + category["spent_in_base_currency"],
+                AMOUNT_ACCURACY,
+            )
+
+            for currency, value in grouped_by_parent[parent_name][
+                "spent_in_currencies"
+            ].items():
+                grouped_by_parent[parent_name]["spent_in_currencies"][currency][
+                    "amount"
+                ] = round(
+                    value["amount"]
+                    + category["spent_in_currencies"][currency]["amount"],
+                    AMOUNT_ACCURACY,
+                )
+        return grouped_by_parent
+
+    @classmethod
     def load_transaction(cls, transaction_uuid: str) -> TransactionItem:
         transaction = Transaction.objects.get(uuid=transaction_uuid)
         return cls.get_transaction(transaction)
@@ -119,28 +157,16 @@ class TransactionService:
     def load_grouped_transactions(
         cls, *, date_from: Optional[str] = None, date_to: Optional[str] = None
     ) -> List[GroupedByParent]:
-
-        grouped_by_category = {}
-        transactions = []
         qs = Transaction.objects.all().order_by("-created_at")
         if date_from:
             qs = qs.filter(transaction_date__gte=date_from)
         if date_to:
             qs = qs.filter(transaction_date__lte=date_to)
 
-        grouped_by_parent = {}
         grouped_by_category = cls.group_by_category(qs)
+        grouped_by_parent = cls.group_by_parent(grouped_by_category)
 
-        for category in sorted(grouped_by_category.keys()):
-            grouped_by_parent[
-                grouped_by_category[category]["parent_name"]
-            ] = grouped_by_parent.get(grouped_by_category[category]["parent_name"], [])
-            grouped_by_parent[grouped_by_category[category]["parent_name"]].append(
-                grouped_by_category[category]
-            )
-
-        for key in sorted(grouped_by_parent.keys()):
-            transactions.append(
-                GroupedByParent(category_name=key, items=grouped_by_parent[key])
-            )
+        transactions = []
+        for key, value in sorted(grouped_by_parent.items()):
+            transactions.append(value)
         return transactions

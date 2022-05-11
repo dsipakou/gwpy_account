@@ -47,6 +47,8 @@ class GroupedByCategorySerializer(serializers.Serializer):
 
 class GroupedTransactionSerializer(serializers.Serializer):
     category_name = serializers.CharField()
+    spent_in_base_currency = serializers.FloatField()
+    spent_in_currencies = serializers.DictField(read_only=True)
     items = serializers.ListField(child=GroupedByCategorySerializer())
 
 

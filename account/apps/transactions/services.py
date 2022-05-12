@@ -8,8 +8,6 @@ from transactions.entities import (GroupedByCategory, GroupedByParent,
                                    TransactionSpentInCurrencyDetails)
 from transactions.models import Transaction
 
-AMOUNT_ACCURACY = 6
-
 
 class TransactionService:
     @classmethod
@@ -24,9 +22,7 @@ class TransactionService:
         )
         spent_details = {
             rate.currency.code: TransactionSpentInCurrencyDetails(
-                amount=round(
-                    transaction.spent_in_base_currency / rate.rate, AMOUNT_ACCURACY
-                ),
+                amount=transaction.spent_in_base_currency / rate.rate,
                 sign=rate.currency.sign,
                 currency=rate.currency.uuid,
             )
@@ -74,22 +70,16 @@ class TransactionService:
 
             grouped_by_category[category_name]["items"].append(transaction_details)
 
-            grouped_by_category[category_name]["spent_in_base_currency"] = round(
-                grouped_by_category[category_name]["spent_in_base_currency"]
-                + transaction_details["spent_in_base_currency"],
-                AMOUNT_ACCURACY,
-            )
+            grouped_by_category[category_name][
+                "spent_in_base_currency"
+            ] += transaction_details["spent_in_base_currency"]
 
             for currency, value in grouped_by_category[category_name][
                 "spent_in_currencies"
             ].items():
                 grouped_by_category[category_name]["spent_in_currencies"][currency][
                     "amount"
-                ] = round(
-                    value["amount"]
-                    + transaction_details["spent_in_currencies"][currency]["amount"],
-                    AMOUNT_ACCURACY,
-                )
+                ] += value["amount"]
         return grouped_by_category
 
     @classmethod
@@ -97,7 +87,7 @@ class TransactionService:
         cls, grouped_by_category: Dict[str, GroupedByCategory]
     ) -> GroupedByParent:
         grouped_by_parent = {}
-        for category in grouped_by_category.values():
+        for _, category in sorted(grouped_by_category.items()):
             parent_name = category["parent_name"]
             if parent_name not in grouped_by_parent:
                 grouped_by_parent[parent_name] = GroupedByParent(
@@ -110,22 +100,16 @@ class TransactionService:
 
             grouped_by_parent[parent_name]["items"].append(category)
 
-            grouped_by_parent[parent_name]["spent_in_base_currency"] = round(
-                grouped_by_parent[parent_name]["spent_in_base_currency"]
-                + category["spent_in_base_currency"],
-                AMOUNT_ACCURACY,
-            )
+            grouped_by_parent[parent_name]["spent_in_base_currency"] += category[
+                "spent_in_base_currency"
+            ]
 
             for currency, value in grouped_by_parent[parent_name][
                 "spent_in_currencies"
             ].items():
                 grouped_by_parent[parent_name]["spent_in_currencies"][currency][
                     "amount"
-                ] = round(
-                    value["amount"]
-                    + category["spent_in_currencies"][currency]["amount"],
-                    AMOUNT_ACCURACY,
-                )
+                ] += value["amount"]
         return grouped_by_parent
 
     @classmethod
@@ -167,6 +151,6 @@ class TransactionService:
         grouped_by_parent = cls.group_by_parent(grouped_by_category)
 
         transactions = []
-        for key, value in sorted(grouped_by_parent.items()):
+        for _, value in sorted(grouped_by_parent.items()):
             transactions.append(value)
         return transactions

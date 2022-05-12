@@ -51,6 +51,9 @@ class GroupedTransactionSerializer(serializers.Serializer):
     spent_in_currencies = serializers.DictField(read_only=True)
     items = serializers.ListField(child=GroupedByCategorySerializer())
 
+    def validate_spent_in_base_currency(self, value):
+        return round(value, 4)
+
 
 class TransactionCreateSerializer(serializers.ModelSerializer):
     class Meta:

@@ -12,6 +12,14 @@ class Rate(models.Model):
     description = models.CharField(max_length=255, blank=True)
     created_at = models.DateTimeField(auto_now_add=True)
     modified_at = models.DateTimeField(auto_now=True)
+    base_currency = models.ForeignKey(
+        Currency,
+        to_field="uuid",
+        on_delete=models.DO_NOTHING,
+        related_name="base_currency",
+        blank=True,
+        null=True,
+    )
 
     class Meta:
         unique_together = ["currency", "rate_date"]

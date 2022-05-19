@@ -34,7 +34,7 @@ class TransactionService:
             user=transaction.user.uuid,
             category=transaction.category.uuid,
             category_details=category_details,
-            budget=transaction.budget,
+            budget=transaction.budget.uuid,
             currency=transaction.currency.uuid,
             amount=transaction.amount,
             spent_in_base_currency=transaction.spent_in_base_currency,

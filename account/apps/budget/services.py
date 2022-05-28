@@ -10,7 +10,7 @@ from budget.entities import (
 from budget.models import Budget
 from categories.models import Category
 from django.db.models import Count, Prefetch, Q
-from transactions.models import Transaction
+from transactions.models import Transaction, Rate
 
 
 class BudgetService:
@@ -18,17 +18,21 @@ class BudgetService:
     def load_budget(
         cls, date_from: datetime.date, date_to: datetime.date
     ) -> List[CategoryItem]:
+        cls.start = datetime.datetime.now()
         budgets = (
             Budget.objects.filter(budget_date__lte=date_to, budget_date__gte=date_from)
             .prefetch_related(
                 Prefetch(
                     "transaction_set",
-                    queryset=Transaction.objects.all(),
+                    queryset=Transaction.objects.select_related("currency")
+                    .all(),
                     to_attr="budget_transactions",
                 ),
             )
             .order_by("title")
         )
+
+        print(f"Step 1 {(datetime.datetime.now() - cls.start)}")
 
         categories = (
             Category.objects.filter()
@@ -47,6 +51,8 @@ class BudgetService:
             .filter(budget_count__gt=0)
             .order_by("name")
         )
+
+        print(f"Step 2 {(datetime.datetime.now() - cls.start)}")
 
         return cls.make_categories(categories)
 
@@ -68,6 +74,7 @@ class BudgetService:
     def make_categories(cls, categories) -> List[CategoryItem]:
         categories_list = []
         for category in categories:
+            print(f"Step 3 {(datetime.datetime.now() - cls.start)}")
             budgets = cls.make_grouped_budgets(category.category_budgets)
             spent_in_base_currency = sum(
                 item["spent_in_base_currency"] for item in budgets
@@ -93,6 +100,7 @@ class BudgetService:
         budgets_list = []
         grouped_dict = {}
         for budget in cls.make_budgets(budgets):
+            print(f"Step 4 {(datetime.datetime.now() - cls.start)}")
             if budget["title"] not in grouped_dict:
                 grouped_dict[budget["title"]] = {
                     "uuid": budget["uuid"],
@@ -120,6 +128,8 @@ class BudgetService:
     def make_budgets(cls, budgets) -> List[BudgetItem]:
         budgets_list = []
         for budget in budgets:
+            print(budget.title)
+            print(f"Step 5: make_budgets {(datetime.datetime.now() - cls.start)}")
             transactions = cls.make_transactions(budget.budget_transactions)
             spent_in_base_currency = 0
             spent_in_original_currency = 0
@@ -149,7 +159,7 @@ class BudgetService:
         return budgets_list
 
     @classmethod
-    def make_transactions(cls, transactions) -> List[BudgetTransactionItem]:
+    def make_transactions(cls, transactions) -> List[dict]:
         transactions_list = []
         for transaction in transactions:
             transactions_list.append(

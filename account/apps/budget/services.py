@@ -1,16 +1,12 @@
 import datetime
 from typing import List
 
-from budget.entities import (
-    BudgetGroupedItem,
-    BudgetItem,
-    BudgetTransactionItem,
-    CategoryItem,
-)
+from budget.entities import (BudgetGroupedItem, BudgetItem,
+                             BudgetTransactionItem, CategoryItem)
 from budget.models import Budget
 from categories.models import Category
 from django.db.models import Count, Prefetch, Q
-from transactions.models import Transaction, Rate
+from transactions.models import Rate, Transaction
 
 
 class BudgetService:
@@ -24,13 +20,15 @@ class BudgetService:
             .prefetch_related(
                 Prefetch(
                     "transaction_set",
-                    queryset=Transaction.objects.select_related("currency")
-                    .all(),
+                    queryset=Transaction.objects.select_related("currency").all(),
                     to_attr="budget_transactions",
                 ),
             )
             .order_by("title")
         )
+
+        rates = Rate.objects.filter(rate_date__lte=date_to, rate_date__gte=date_from)
+        rates_dict = {(rate.currency.uuid, rate.rate_date): rate.rate for rate in rates}
 
         print(f"Step 1 {(datetime.datetime.now() - cls.start)}")
 
@@ -54,7 +52,7 @@ class BudgetService:
 
         print(f"Step 2 {(datetime.datetime.now() - cls.start)}")
 
-        return cls.make_categories(categories)
+        return cls.make_categories(categories, rates_dict)
 
     @classmethod
     def load_weekly_budget(cls, date_from, date_to) -> List[BudgetItem]:
@@ -68,14 +66,17 @@ class BudgetService:
             ),
         )
 
-        return cls.make_budgets(budgets)
+        rates = Rate.objects.filter(rate_date__lte=date_to, rate_date__gte=date_from)
+        rates_dict = {(rate.currency.uuid, rate.rate_date): rate.rate for rate in rates}
+
+        return cls.make_budgets(budgets, rates_dict)
 
     @classmethod
-    def make_categories(cls, categories) -> List[CategoryItem]:
+    def make_categories(cls, categories, rates) -> List[CategoryItem]:
         categories_list = []
         for category in categories:
             print(f"Step 3 {(datetime.datetime.now() - cls.start)}")
-            budgets = cls.make_grouped_budgets(category.category_budgets)
+            budgets = cls.make_grouped_budgets(category.category_budgets, rates)
             spent_in_base_currency = sum(
                 item["spent_in_base_currency"] for item in budgets
             )
@@ -96,10 +97,10 @@ class BudgetService:
         return categories_list
 
     @classmethod
-    def make_grouped_budgets(cls, budgets) -> List[BudgetGroupedItem]:
+    def make_grouped_budgets(cls, budgets, rates) -> List[BudgetGroupedItem]:
         budgets_list = []
         grouped_dict = {}
-        for budget in cls.make_budgets(budgets):
+        for budget in cls.make_budgets(budgets, rates):
             print(f"Step 4 {(datetime.datetime.now() - cls.start)}")
             if budget["title"] not in grouped_dict:
                 grouped_dict[budget["title"]] = {
@@ -125,12 +126,12 @@ class BudgetService:
         return budgets_list
 
     @classmethod
-    def make_budgets(cls, budgets) -> List[BudgetItem]:
+    def make_budgets(cls, budgets, rates) -> List[BudgetItem]:
         budgets_list = []
         for budget in budgets:
             print(budget.title)
             print(f"Step 5: make_budgets {(datetime.datetime.now() - cls.start)}")
-            transactions = cls.make_transactions(budget.budget_transactions)
+            transactions = cls.make_transactions(budget.budget_transactions, rates)
             spent_in_base_currency = 0
             spent_in_original_currency = 0
             if len(transactions) > 0:
@@ -159,15 +160,34 @@ class BudgetService:
         return budgets_list
 
     @classmethod
-    def make_transactions(cls, transactions) -> List[dict]:
+    def make_transactions(cls, transactions, rates) -> List[dict]:
         transactions_list = []
         for transaction in transactions:
+            if transaction.currency.is_base:
+                spent_in_base_currency = transaction.amount
+            else:
+                if (
+                    transaction.currency.uuid,
+                    transaction.transaction_date,
+                ) not in rates:
+                    print(
+                        f"Step 6: make_transactions {(transaction.currency.uuid, transaction.transaction_date)}"
+                    )
+                    print(
+                        f"Not in rates: {transaction.currency.is_base} {transaction.currency.code}"
+                    )
+                spent_in_base_currency = (
+                    rates.get(
+                        (transaction.currency.uuid, transaction.transaction_date), 0
+                    )
+                    * transaction.amount
+                )
             transactions_list.append(
                 BudgetTransactionItem(
                     uuid=transaction.uuid,
                     currency=transaction.currency.uuid,
                     currency_code=transaction.currency.code,
-                    spent_in_base_currency=transaction.spent_in_base_currency,
+                    spent_in_base_currency=spent_in_base_currency,
                     spent_in_original_currency=transaction.amount,
                 )
             )

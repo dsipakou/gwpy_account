@@ -50,8 +50,6 @@ class BudgetService:
             .order_by("name")
         )
 
-        print(f"Step 2 {(datetime.datetime.now() - cls.start)}")
-
         return cls.make_categories(categories, rates_dict)
 
     @classmethod

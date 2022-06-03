@@ -18,7 +18,7 @@ from rest_framework.response import Response
 
 
 class BudgetList(ListCreateAPIView):
-    queryset = Budget.objects.all()
+    queryset = Budget.objects.select_related("category").all()
     serializer_class = BudgetSerializer
 
     def perform_create(self, serializer):

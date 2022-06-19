@@ -8,6 +8,7 @@ class RateSerializer(serializers.ModelSerializer):
         fields = (
             "uuid",
             "currency",
+            "base_currency",
             "rate_date",
             "rate",
             "description",

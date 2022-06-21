@@ -2,11 +2,12 @@ from budget.models import Budget
 from categories.models import Category
 from categories.serializers import CategorySerializer
 from rest_framework.exceptions import ValidationError
-from rest_framework.generics import ListCreateAPIView, RetrieveUpdateDestroyAPIView
+from rest_framework.generics import (ListCreateAPIView,
+                                     RetrieveUpdateDestroyAPIView)
 
 
 class CategoryList(ListCreateAPIView):
-    queryset = Category.objects.all().order_by('name')
+    queryset = Category.objects.all().order_by("name")
     serializer_class = CategorySerializer
 
     def perform_create(self, serializer):

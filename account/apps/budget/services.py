@@ -27,7 +27,9 @@ class BudgetService:
             .order_by("title")
         )
 
-        rates = Rate.objects.filter(rate_date__lte=date_to, rate_date__gte=date_from).prefetch_related("currency")
+        rates = Rate.objects.filter(
+            rate_date__lte=date_to, rate_date__gte=date_from
+        ).prefetch_related("currency")
         rates_dict = {(rate.currency.uuid, rate.rate_date): rate.rate for rate in rates}
 
         print(f"Step 1 {(datetime.datetime.now() - cls.start)}")

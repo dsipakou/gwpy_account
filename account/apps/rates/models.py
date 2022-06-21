@@ -17,8 +17,6 @@ class Rate(models.Model):
         to_field="uuid",
         on_delete=models.DO_NOTHING,
         related_name="base_currency",
-        blank=True,
-        null=True,
     )
 
     class Meta:

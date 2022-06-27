@@ -20,6 +20,7 @@ class BudgetItem(TypedDict):
     category_name: str
     description: str
     is_completed: bool
+    recurrent: str
     planned: float
     spent_in_base_currency: float
     spent_in_original_currency: float

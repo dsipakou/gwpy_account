@@ -13,6 +13,7 @@ class BudgetSerializer(serializers.ModelSerializer):
             "category",
             "title",
             "amount",
+            "recurrent",
             "budget_date",
             "description",
             "is_completed",
@@ -65,6 +66,7 @@ class BudgetUsageSerializer(serializers.Serializer):
     budget_date = serializers.DateField()
     category = serializers.UUIDField()
     is_completed = serializers.BooleanField()
+    recurrent = serializers.CharField()
     description = serializers.CharField(allow_blank=True, allow_null=True)
     transactions = serializers.ListField(child=TransactionSerializer())
     spent_in_original_currency = serializers.FloatField()

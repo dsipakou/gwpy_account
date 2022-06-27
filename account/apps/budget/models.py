@@ -5,6 +5,11 @@ from django.db.models import Q
 
 
 class Budget(models.Model):
+    RECURRENT_CHOICES = (
+        ("weekly", "Weekly"),
+        ("monthly", "Monthly"),
+    )
+
     uuid = models.UUIDField(unique=True, default=uuid.uuid4, editable=False)
     category = models.ForeignKey(
         "categories.Category", on_delete=models.CASCADE, to_field="uuid", null=True
@@ -14,5 +19,8 @@ class Budget(models.Model):
     budget_date = models.DateField()
     description = models.CharField(max_length=255, blank=True)
     is_completed = models.BooleanField(default=False)
+    recurrent = models.CharField(
+        null=True, blank=True, max_length=20, choices=RECURRENT_CHOICES
+    )
     created_at = models.DateTimeField(auto_now_add=True)
     modified_at = models.DateTimeField(auto_now=True)

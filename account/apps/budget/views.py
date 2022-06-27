@@ -75,7 +75,6 @@ class ActualUsageBudgetList(ListAPIView):
 
         start = datetime.datetime.now()
         categories = BudgetService.load_budget(date_from, date_to)
-        print(f"Month load speed {(datetime.datetime.now() - start)}")
 
         serializer = self.get_serializer(categories, many=True)
         return Response(serializer.data)

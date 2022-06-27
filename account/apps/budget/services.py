@@ -32,8 +32,6 @@ class BudgetService:
         ).prefetch_related("currency")
         rates_dict = {(rate.currency.uuid, rate.rate_date): rate.rate for rate in rates}
 
-        print(f"Step 1 {(datetime.datetime.now() - cls.start)}")
-
         categories = (
             Category.objects.filter()
             .prefetch_related(
@@ -75,7 +73,6 @@ class BudgetService:
     def make_categories(cls, categories, rates) -> List[CategoryItem]:
         categories_list = []
         for category in categories:
-            print(f"Step 3 {(datetime.datetime.now() - cls.start)}")
             budgets = cls.make_grouped_budgets(category.category_budgets, rates)
             spent_in_base_currency = sum(
                 item["spent_in_base_currency"] for item in budgets
@@ -101,7 +98,6 @@ class BudgetService:
         budgets_list = []
         grouped_dict = {}
         for budget in cls.make_budgets(budgets, rates):
-            print(f"Step 4 {(datetime.datetime.now() - cls.start)}")
             if budget["title"] not in grouped_dict:
                 grouped_dict[budget["title"]] = {
                     "uuid": budget["uuid"],
@@ -129,8 +125,6 @@ class BudgetService:
     def make_budgets(cls, budgets, rates) -> List[BudgetItem]:
         budgets_list = []
         for budget in budgets:
-            print(budget.title)
-            print(f"Step 5: make_budgets {(datetime.datetime.now() - cls.start)}")
             transactions = cls.make_transactions(budget.budget_transactions, rates)
             spent_in_base_currency = 0
             spent_in_original_currency = 0
@@ -149,6 +143,7 @@ class BudgetService:
                     budget_date=budget.budget_date,
                     transactions=transactions,
                     description=budget.description,
+                    recurrent=budget.recurrent,
                     is_completed=budget.is_completed,
                     planned=budget.amount,
                     spent_in_base_currency=spent_in_base_currency,
@@ -166,16 +161,6 @@ class BudgetService:
             if transaction.currency.is_base:
                 spent_in_base_currency = transaction.amount
             else:
-                if (
-                    transaction.currency.uuid,
-                    transaction.transaction_date,
-                ) not in rates:
-                    print(
-                        f"Step 6: make_transactions {(transaction.currency.uuid, transaction.transaction_date)}"
-                    )
-                    print(
-                        f"Not in rates: {transaction.currency.is_base} {transaction.currency.code}"
-                    )
                 spent_in_base_currency = (
                     rates.get(
                         (transaction.currency.uuid, transaction.transaction_date), 0

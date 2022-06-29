@@ -1,10 +1,12 @@
 import datetime
 
 from budget.models import Budget
-from budget.serializers import (BudgetSerializer, BudgetUsageSerializer,
+from budget.serializers import (ArchiveSerializer, BudgetSerializer,
+                                BudgetUsageSerializer,
                                 CategoryBudgetSerializer,
                                 PlannedBudgetSerializer)
 from budget.services import BudgetService
+from html5lib import serialize
 from rest_framework.exceptions import ValidationError
 from rest_framework.generics import (ListAPIView, ListCreateAPIView,
                                      RetrieveUpdateDestroyAPIView)
@@ -93,6 +95,16 @@ class WeeklyUsageList(ListAPIView):
         budgets = BudgetService.load_weekly_budget(date_from, date_to)
 
         serializer = self.get_serializer(budgets, many=True)
-        serializer.data
-        print(f"Week load speed {(datetime.datetime.now() - start)}")
+        return Response(serializer.data)
+
+
+class ArchiveView(ListAPIView):
+    serializer_class = ArchiveSerializer
+
+    def list(self, request, *args, **kwargs):
+        current_date = request.GET.get("date")
+
+        archive = BudgetService.get_archive(current_date)
+
+        serializer = self.get_serializer(archive, many=True)
         return Response(serializer.data)

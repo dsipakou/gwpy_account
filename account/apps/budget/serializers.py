@@ -75,6 +75,11 @@ class BudgetUsageSerializer(serializers.Serializer):
     modified_at = serializers.DateTimeField()
 
 
+class ArchiveSerializer(serializers.Serializer):
+    month = serializers.DateField()
+    planned = serializers.IntegerField()
+
+
 class WeeklyBudgetUsageSerializer(serializers.Serializer):
     uuid = serializers.UUIDField()
     title = serializers.CharField()

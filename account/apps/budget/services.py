@@ -2,14 +2,39 @@ import datetime
 from typing import List
 
 from budget.entities import (BudgetGroupedItem, BudgetItem,
-                             BudgetTransactionItem, CategoryItem)
+                             BudgetTransactionItem, CategoryItem,
+                             MonthUsageSum)
 from budget.models import Budget
 from categories.models import Category
-from django.db.models import Count, Prefetch, Q
+from dateutil.relativedelta import relativedelta
+from django.db.models import Count, Prefetch, Q, Sum
+from django.db.models.functions import TruncMonth
 from transactions.models import Rate, Transaction
 
 
 class BudgetService:
+    @classmethod
+    def get_archive(cls, current_date: datetime.date) -> List[MonthUsageSum]:
+        archive = []
+        start_date = datetime.date.fromisoformat(current_date) - relativedelta(months=6)
+        end_date = start_date + relativedelta(months=6)
+
+        archive_sum = (
+            Budget.objects.annotate(month=TruncMonth("budget_date"))
+            .filter(
+                budget_date__gte=start_date,
+                budget_date__lt=end_date,
+            )
+            .values("month")
+            .annotate(planned=Sum("amount"))
+            .order_by("month")
+        )
+
+        for item in archive_sum:
+            archive.append(MonthUsageSum(month=item["month"], planned=item["planned"]))
+
+        return archive
+
     @classmethod
     def load_budget(
         cls, date_from: datetime.date, date_to: datetime.date

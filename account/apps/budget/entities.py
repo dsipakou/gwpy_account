@@ -44,3 +44,8 @@ class CategoryItem(TypedDict):
     planned: float
     spent_in_original_currency: float
     spent_in_base_currency: float
+
+
+class MonthUsageSum(TypedDict):
+    month: datetime.date
+    planned: float

@@ -11,4 +11,5 @@ urlpatterns = [
         views.WeeklyUsageList.as_view(),
         name="weekly_usage_budget_list",
     ),
+    path("archive/", views.ArchiveView.as_view(), name="archive_budget"),
 ]

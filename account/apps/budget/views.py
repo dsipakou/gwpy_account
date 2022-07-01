@@ -103,8 +103,9 @@ class ArchiveView(ListAPIView):
 
     def list(self, request, *args, **kwargs):
         current_date = request.GET.get("date")
+        category_uuid = request.GET.get("category")
 
-        archive = BudgetService.get_archive(current_date)
+        archive = BudgetService.get_archive(current_date, category_uuid)
 
         serializer = self.get_serializer(archive, many=True)
         return Response(serializer.data)

@@ -14,9 +14,13 @@ from transactions.models import Rate, Transaction
 
 class BudgetService:
     @classmethod
-    def get_archive(cls, current_date: datetime.date) -> List[MonthUsageSum]:
+    def get_archive(
+        cls, current_date: datetime.date, category_uuid: str
+    ) -> List[MonthUsageSum]:
         archive = []
-        start_date = datetime.date.fromisoformat(current_date) - relativedelta(months=6)
+        start_date = datetime.date.fromisoformat(current_date).replace(
+            day=1
+        ) - relativedelta(months=6)
         end_date = start_date + relativedelta(months=6)
 
         archive_sum = (
@@ -24,6 +28,7 @@ class BudgetService:
             .filter(
                 budget_date__gte=start_date,
                 budget_date__lt=end_date,
+                category=category_uuid,
             )
             .values("month")
             .annotate(planned=Sum("amount"))

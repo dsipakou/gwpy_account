@@ -11,4 +11,5 @@ urlpatterns = [
         views.TransactionGroupedList.as_view(),
         name="transaction_grouped_list",
     ),
+    path("report/", views.TransactionReportList.as_view(), name="transaction_reponrt"),
 ]

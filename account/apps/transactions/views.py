@@ -57,3 +57,15 @@ class TransactionGroupedList(ListAPIView):
 
         serializer = self.get_serializer(transactions, many=True)
         return Response(serializer.data)
+
+
+class TransactionReportList(ListAPIView):
+    def list(self, request, *args, **kwargs):
+        date_to = request.GET.get("dateFrom", datetime.date.today())
+        date_from = request.GET.get(
+            "dateTo", datetime.date.today() - datetime.timedelta(days=365)
+        )
+        currency = request.GET.get("currency")
+        return Response(
+            f"date_from: {date_from}, date_to: {date_to}, currency: {currency}"
+        )

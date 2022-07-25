@@ -1,7 +1,7 @@
 import copy
 from typing import Dict, List, Optional
 
-from django.db.models import QuerySet
+from django.db.models import QuerySet, Sum
 from transactions.entities import (GroupedByCategory, GroupedByParent,
                                    TransactionAccountDetails,
                                    TransactionCategoryDetails, TransactionItem,
@@ -14,8 +14,12 @@ class TransactionService:
     def get_transaction(cls, transaction: Transaction) -> Optional[Transaction]:
         category_details = TransactionCategoryDetails(
             name=transaction.category.name,
-            parent=transaction.category.parent.uuid,
-            parent_name=transaction.category.parent.name,
+            parent=transaction.category.parent.uuid
+            if not transaction.category.is_income
+            else "",
+            parent_name=transaction.category.parent.name
+            if not transaction.category.is_income
+            else "",
         )
         account_details = TransactionAccountDetails(
             source=transaction.account.source,
@@ -154,3 +158,9 @@ class TransactionService:
         for _, value in sorted(grouped_by_parent.items()):
             transactions.append(value)
         return transactions
+
+
+class ReportService:
+    @classmethod
+    def get_year_report(cls, date_from: str, date_to: str, currency_code: str):
+        return Transaction.grouped_by_month(date_from, date_to, currency_code)

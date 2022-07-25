@@ -1,4 +1,4 @@
-import datetime
+from datetime import date, datetime, timedelta
 
 from rest_framework import status
 from rest_framework.generics import (ListAPIView, ListCreateAPIView,
@@ -6,10 +6,11 @@ from rest_framework.generics import (ListAPIView, ListCreateAPIView,
 from rest_framework.response import Response
 from transactions.models import Transaction
 from transactions.serializers import (GroupedTransactionSerializer,
+                                      ReportByMonthSerializer,
                                       TransactionCreateSerializer,
                                       TransactionDetailsSerializer,
                                       TransactionSerializer)
-from transactions.services import TransactionService
+from transactions.services import ReportService, TransactionService
 
 
 class TransactionList(ListCreateAPIView):
@@ -47,10 +48,8 @@ class TransactionGroupedList(ListAPIView):
     serializer_class = GroupedTransactionSerializer
 
     def list(self, request, *args, **kwargs):
-        date_from = request.GET.get(
-            "dateFrom", datetime.date.today() - datetime.timedelta(days=30)
-        )
-        date_to = request.GET.get("dateTo", datetime.date.today())
+        date_from = request.GET.get("dateFrom", date.today() - timedelta(days=30))
+        date_to = request.GET.get("dateTo", date.today())
         transactions = TransactionService.load_grouped_transactions(
             date_from=date_from, date_to=date_to
         )
@@ -60,12 +59,12 @@ class TransactionGroupedList(ListAPIView):
 
 
 class TransactionReportList(ListAPIView):
+    serializer_class = ReportByMonthSerializer
+
     def list(self, request, *args, **kwargs):
-        date_to = request.GET.get("dateFrom", datetime.date.today())
-        date_from = request.GET.get(
-            "dateTo", datetime.date.today() - datetime.timedelta(days=365)
-        )
-        currency = request.GET.get("currency")
-        return Response(
-            f"date_from: {date_from}, date_to: {date_to}, currency: {currency}"
-        )
+        date_to = datetime.strptime(request.GET["dateTo"], "%Y-%m")
+        date_from = datetime.strptime(request.GET["dateFrom"], "%Y-%m")
+        currency_code = request.GET.get("currency")
+        response = ReportService.get_year_report(date_from, date_to, currency_code)
+        serializer = self.get_serializer(response, many=True)
+        return Response(serializer.data)

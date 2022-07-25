@@ -86,3 +86,9 @@ class TransactionDetailsSerializer(serializers.ModelSerializer):
             "created_at",
             "modified_at",
         )
+
+
+class ReportByMonthSerializer(serializers.Serializer):
+    month = serializers.CharField()
+    day = serializers.IntegerField()
+    grouped_amount = serializers.IntegerField()

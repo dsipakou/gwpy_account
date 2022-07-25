@@ -1,8 +1,10 @@
+import textwrap
 import uuid
 
 from currencies.models import Currency
-from django.db import models
+from django.db import connection, models
 from rates.models import Rate
+from transactions.utils import dictfetchall
 
 
 class Transaction(models.Model):
@@ -38,3 +40,46 @@ class Transaction(models.Model):
         return Rate.objects.filter(rate_date=self.transaction_date).select_related(
             "currency"
         )
+
+    @classmethod
+    def grouped_by_month(cls, date_from, date_to, currency_code):
+        raw_sql = textwrap.dedent(
+            """
+        SELECT
+            t1.month,
+            t1.day,
+            CASE
+                WHEN c1.is_base THEN t1.amount
+                WHEN r1.rate is NULL THEN 0
+                ELSE t1.amount / r1.rate
+            END as grouped_amount
+        FROM (
+            SELECT
+                CONCAT(EXTRACT(YEAR FROM t.transaction_date), '-', EXTRACT(MONTH FROM t.transaction_date)) AS month,
+                EXTRACT(DAY FROM t.transaction_date) AS day,
+                SUM(
+                    CASE
+                        WHEN t.currency_id is NULL THEN t.amount
+                        WHEN c.is_base THEN t.amount
+                        ELSE t.amount * r.rate
+                    END
+                ) as amount,
+                t.transaction_date
+            FROM transactions_transaction t
+                LEFT JOIN rates_rate r ON r.currency_id = t.currency_id AND r.rate_date = t.transaction_date
+                LEFT JOIN currencies_currency c ON c.uuid = t.currency_id
+                LEFT JOIN categories_category cc on cc.uuid = t.category_id
+            GROUP BY t.transaction_date, cc.is_income
+            HAVING t.transaction_date >= %s AND t.transaction_date <= %s AND cc.is_income = false
+            ORDER BY t.transaction_date
+        ) as t1
+            INNER JOIN currencies_currency c1 ON c1.code = %s
+            LEFT JOIN rates_rate r1 ON r1.currency_id = c1.uuid AND r1.rate_date = t1.transaction_date
+        ORDER BY r1.rate_date;
+        """
+        )
+        with connection.cursor() as cursor:
+            cursor.execute(raw_sql, [date_from, date_to, currency_code])
+            grouped_transactions = dictfetchall(cursor)
+
+        return grouped_transactions

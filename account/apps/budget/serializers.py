@@ -1,8 +1,7 @@
-import uuid
-
+from budget import constants
 from budget.models import Budget
-from categories.serializers import CategorySerializer
 from rest_framework import serializers
+from rest_framework.exceptions import ValidationError
 
 
 class BudgetSerializer(serializers.ModelSerializer):
@@ -110,3 +109,12 @@ class CategoryBudgetSerializer(serializers.Serializer):
     planned = serializers.FloatField()
     spent_in_original_currency = serializers.FloatField()
     spent_in_base_currency = serializers.FloatField()
+
+
+class DuplicateRequestSerializer(serializers.Serializer):
+    type = serializers.CharField()
+
+    def validate_type(self, value):
+        if value not in constants.ALLOWED_BUDGET_RECURRENT_TYPE:
+            return ValidationError("Unsupported budget reccurent type")
+        return value

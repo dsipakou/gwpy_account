@@ -1,13 +1,13 @@
 import uuid
 
+from budget.constants import BudgetDuplicateType
 from django.db import models
-from django.db.models import Q
 
 
 class Budget(models.Model):
     RECURRENT_CHOICES = (
-        ("weekly", "Weekly"),
-        ("monthly", "Monthly"),
+        (BudgetDuplicateType.WEEKLY, "Weekly"),
+        (BudgetDuplicateType.MONTHLY, "Monthly"),
     )
 
     uuid = models.UUIDField(unique=True, default=uuid.uuid4, editable=False)

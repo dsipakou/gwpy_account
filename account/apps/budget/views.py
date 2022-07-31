@@ -1,21 +1,18 @@
 import datetime
 
+from budget import serializers
 from budget.models import Budget
-from budget.serializers import (ArchiveSerializer, BudgetSerializer,
-                                BudgetUsageSerializer,
-                                CategoryBudgetSerializer,
-                                PlannedBudgetSerializer)
 from budget.services import BudgetService
-from html5lib import serialize
 from rest_framework.exceptions import ValidationError
-from rest_framework.generics import (ListAPIView, ListCreateAPIView,
+from rest_framework.generics import (GenericAPIView, ListAPIView,
+                                     ListCreateAPIView,
                                      RetrieveUpdateDestroyAPIView)
 from rest_framework.response import Response
 
 
 class BudgetList(ListCreateAPIView):
     queryset = Budget.objects.select_related("category").all()
-    serializer_class = BudgetSerializer
+    serializer_class = serializers.BudgetSerializer
 
     def perform_create(self, serializer):
         """Check if category is parent category
@@ -31,7 +28,7 @@ class BudgetList(ListCreateAPIView):
 
 class BudgetDetails(RetrieveUpdateDestroyAPIView):
     queryset = Budget.objects.all()
-    serializer_class = BudgetSerializer
+    serializer_class = serializers.BudgetSerializer
     lookup_field = "uuid"
 
     def perform_update(self, serializer):
@@ -48,7 +45,7 @@ class BudgetDetails(RetrieveUpdateDestroyAPIView):
 
 class PlannedBudgetList(ListAPIView):
     queryset = Budget.objects.all()
-    serializer_class = PlannedBudgetSerializer
+    serializer_class = serializers.PlannedBudgetSerializer
 
     def list(self, request, *args, **kwargs):
         dateFrom = request.GET.get(
@@ -67,7 +64,7 @@ class PlannedBudgetList(ListAPIView):
 
 
 class ActualUsageBudgetList(ListAPIView):
-    serializer_class = CategoryBudgetSerializer
+    serializer_class = serializers.CategoryBudgetSerializer
 
     def list(self, request, *args, **kwargs):
         date_from = request.GET.get(
@@ -83,7 +80,7 @@ class ActualUsageBudgetList(ListAPIView):
 
 
 class WeeklyUsageList(ListAPIView):
-    serializer_class = BudgetUsageSerializer
+    serializer_class = serializers.BudgetUsageSerializer
 
     def list(self, request, *args, **kwargs):
         start = datetime.datetime.now()
@@ -99,7 +96,7 @@ class WeeklyUsageList(ListAPIView):
 
 
 class ArchiveView(ListAPIView):
-    serializer_class = ArchiveSerializer
+    serializer_class = serializers.ArchiveSerializer
 
     def list(self, request, *args, **kwargs):
         current_date = request.GET.get("date")
@@ -109,3 +106,15 @@ class ArchiveView(ListAPIView):
 
         serializer = self.get_serializer(archive, many=True)
         return Response(serializer.data)
+
+
+class DuplicateBudgetView(GenericAPIView):
+    serializer_class = serializers.DuplicateRequestSerializer
+
+    def post(self, request, *args, **kwargs):
+        serializer = self.get_serializer(data=request.data)
+        serializer.is_valid(raise_exception=True)
+        budgets = BudgetService.duplicate_budget(serializer.data["type"])
+        for b in budgets:
+            print(b.budget_date, b.title)
+        return Response("OK")

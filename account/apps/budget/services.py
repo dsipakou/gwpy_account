@@ -245,7 +245,9 @@ class BudgetService:
                 budget_date=upcoming_item_date,
             )
             if not existing_item.exists():
-                output.append({"date": upcoming_item_date, "title": item.title})
+                output.append(
+                    {"uuid": item.uuid, "date": upcoming_item_date, "title": item.title}
+                )
                 Budget.objects.create(
                     category=item.category,
                     title=item.title,

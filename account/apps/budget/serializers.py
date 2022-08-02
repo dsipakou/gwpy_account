@@ -121,5 +121,6 @@ class DuplicateRequestSerializer(serializers.Serializer):
 
 
 class DuplicateResponseSerializer(serializers.Serializer):
+    uuid = serializers.UUIDField()
     date = serializers.DateField()
     title = serializers.CharField()

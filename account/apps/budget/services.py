@@ -1,5 +1,5 @@
 import datetime
-from typing import List
+from typing import Dict, List
 
 from budget import utils
 from budget.constants import BudgetDuplicateType
@@ -212,7 +212,9 @@ class BudgetService:
         return transactions_list
 
     @classmethod
-    def duplicate_budget(cls, type: BudgetDuplicateType):
+    def duplicate_budget(
+        cls, type: BudgetDuplicateType
+    ) -> List[Dict[datetime.date, str]]:
         type_mapping = {
             BudgetDuplicateType.MONTHLY: {
                 "start_date": utils.get_first_day_of_prev_month(),
@@ -229,21 +231,27 @@ class BudgetService:
         if type_mapping.get(type) is None:
             raise UnsupportedDuplicateTypeError
 
-        print(type_mapping[type]["start_date"])
-        print(type_mapping[type]["end_date"])
-
         items = Budget.objects.filter(
             recurrent=type,
             budget_date__gte=type_mapping[type]["start_date"],
             budget_date__lte=type_mapping[type]["end_date"],
         ).order_by("budget_date")
+
+        output = []
         for item in items:
+            upcoming_item_date = item.budget_date + type_mapping[type]["relative_date"]
             existing_item = Budget.objects.filter(
                 title=item.title,
-                budget_date=item.budget_date + type_mapping[type]["relative_date"],
+                budget_date=upcoming_item_date,
             )
-            if existing_item.exists():
-                print(f"yes {existing_item[0].title}")
-            else:
-                print("no")
-        return items
+            if not existing_item.exists():
+                output.append({"date": upcoming_item_date, "title": item.title})
+                Budget.objects.create(
+                    category=item.category,
+                    title=item.title,
+                    amount=item.amount,
+                    budget_date=upcoming_item_date,
+                    description=item.description,
+                    recurrent=item.recurrent,
+                )
+        return output

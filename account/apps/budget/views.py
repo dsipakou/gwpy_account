@@ -2,6 +2,7 @@ import datetime
 
 from budget import serializers
 from budget.models import Budget
+from budget.serializers import DuplicateResponseSerializer
 from budget.services import BudgetService
 from rest_framework.exceptions import ValidationError
 from rest_framework.generics import (GenericAPIView, ListAPIView,
@@ -115,6 +116,6 @@ class DuplicateBudgetView(GenericAPIView):
         serializer = self.get_serializer(data=request.data)
         serializer.is_valid(raise_exception=True)
         budgets = BudgetService.duplicate_budget(serializer.data["type"])
-        for b in budgets:
-            print(b.budget_date, b.title)
-        return Response("OK")
+        response_serializer = DuplicateResponseSerializer(data=budgets, many=True)
+        response_serializer.is_valid(raise_exception=True)
+        return Response(response_serializer.data)

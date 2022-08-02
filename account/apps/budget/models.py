@@ -6,8 +6,8 @@ from django.db import models
 
 class Budget(models.Model):
     RECURRENT_CHOICES = (
-        (BudgetDuplicateType.WEEKLY, "Weekly"),
-        (BudgetDuplicateType.MONTHLY, "Monthly"),
+        (BudgetDuplicateType.WEEKLY.value, "Weekly"),
+        (BudgetDuplicateType.MONTHLY.value, "Monthly"),
     )
 
     uuid = models.UUIDField(unique=True, default=uuid.uuid4, editable=False)

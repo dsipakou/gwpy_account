@@ -118,3 +118,8 @@ class DuplicateRequestSerializer(serializers.Serializer):
         if value not in constants.ALLOWED_BUDGET_RECURRENT_TYPE:
             return ValidationError("Unsupported budget reccurent type")
         return value
+
+
+class DuplicateResponseSerializer(serializers.Serializer):
+    date = serializers.DateField()
+    title = serializers.CharField()

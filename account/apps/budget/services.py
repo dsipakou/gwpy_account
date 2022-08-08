@@ -14,6 +14,19 @@ from django.db.models import Count, Prefetch, Q, Sum
 from django.db.models.functions import TruncMonth
 from transactions.models import Rate, Transaction
 
+RECURRENT_TYPE_MAPPING = {
+    BudgetDuplicateType.MONTHLY: {
+        "start_date": utils.get_first_day_of_prev_month(),
+        "end_date": utils.get_last_day_of_prev_month(),
+        "relative_date": relativedelta(months=1),
+    },
+    BudgetDuplicateType.WEEKLY: {
+        "start_date": utils.get_first_day_of_prev_week(),
+        "end_date": utils.get_last_day_of_prev_week(),
+        "relative_date": relativedelta(weeks=1),
+    },
+}
+
 
 class BudgetService:
     @classmethod
@@ -212,34 +225,24 @@ class BudgetService:
         return transactions_list
 
     @classmethod
-    def duplicate_budget(
-        cls, type: BudgetDuplicateType
+    def get_duplicate_budget_candidates(
+        cls, recurrent_type: BudgetDuplicateType
     ) -> List[Dict[datetime.date, str]]:
-        type_mapping = {
-            BudgetDuplicateType.MONTHLY: {
-                "start_date": utils.get_first_day_of_prev_month(),
-                "end_date": utils.get_last_day_of_prev_month(),
-                "relative_date": relativedelta(months=1),
-            },
-            BudgetDuplicateType.WEEKLY: {
-                "start_date": utils.get_first_day_of_prev_week(),
-                "end_date": utils.get_last_day_of_prev_week(),
-                "relative_date": relativedelta(weeks=1),
-            },
-        }
-
-        if type_mapping.get(type) is None:
+        if RECURRENT_TYPE_MAPPING.get(recurrent_type) is None:
             raise UnsupportedDuplicateTypeError
 
         items = Budget.objects.filter(
-            recurrent=type,
-            budget_date__gte=type_mapping[type]["start_date"],
-            budget_date__lte=type_mapping[type]["end_date"],
+            recurrent=recurrent_type,
+            budget_date__gte=RECURRENT_TYPE_MAPPING[recurrent_type]["start_date"],
+            budget_date__lte=RECURRENT_TYPE_MAPPING[recurrent_type]["end_date"],
         ).order_by("budget_date")
 
         output = []
         for item in items:
-            upcoming_item_date = item.budget_date + type_mapping[type]["relative_date"]
+            upcoming_item_date = (
+                item.budget_date
+                + RECURRENT_TYPE_MAPPING[recurrent_type]["relative_date"]
+            )
             existing_item = Budget.objects.filter(
                 title=item.title,
                 budget_date=upcoming_item_date,
@@ -248,12 +251,25 @@ class BudgetService:
                 output.append(
                     {"uuid": item.uuid, "date": upcoming_item_date, "title": item.title}
                 )
-                Budget.objects.create(
-                    category=item.category,
-                    title=item.title,
-                    amount=item.amount,
-                    budget_date=upcoming_item_date,
-                    description=item.description,
-                    recurrent=item.recurrent,
-                )
         return output
+
+    @classmethod
+    def duplicate_budget(cls, uuids: List[str]):
+        for uuid in uuids:
+            budget_item = Budget.objects.get(uuid=uuid)
+            upcoming_item_date = (
+                budget_item.budget_date
+            )  + RECURRENT_TYPE_MAPPING[budget_item.recurrent]["relative_date"]
+            existing_item = Budget.objects.filter(
+                title=budget_item.title,
+                budget_date=upcoming_item_date,
+            )
+            if not existing_item.exists():
+                Budget.objects.create(
+                    category=budget_item.category,
+                    title=budget_item.title,
+                    amount=budget_item.amount,
+                    budget_date=upcoming_item_date,
+                    description=budget_item.description,
+                    recurrent=budget_item.recurrent,
+                )

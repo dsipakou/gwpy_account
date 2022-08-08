@@ -1,9 +1,11 @@
 import datetime
 
 from budget import serializers
+from budget.constants import BudgetDuplicateType
 from budget.models import Budget
 from budget.serializers import DuplicateResponseSerializer
 from budget.services import BudgetService
+from rest_framework import status
 from rest_framework.exceptions import ValidationError
 from rest_framework.generics import (GenericAPIView, ListAPIView,
                                      ListCreateAPIView,
@@ -112,10 +114,17 @@ class ArchiveView(ListAPIView):
 class DuplicateBudgetView(GenericAPIView):
     serializer_class = serializers.DuplicateRequestSerializer
 
+    def get(self, request, *args, **kwargs):
+        if (recurrent_type := request.query_params.get("type")) is not None:
+            budgets = BudgetService.get_duplicate_budget_candidates(recurrent_type)
+            response_serializer = DuplicateResponseSerializer(data=budgets, many=True)
+            response_serializer.is_valid(raise_exception=True)
+            return Response(response_serializer.data)
+        else:
+            return Response(status=status.HTTP_200_OK, data=[])
+
     def post(self, request, *args, **kwargs):
         serializer = self.get_serializer(data=request.data)
         serializer.is_valid(raise_exception=True)
-        budgets = BudgetService.duplicate_budget(serializer.data["type"])
-        response_serializer = DuplicateResponseSerializer(data=budgets, many=True)
-        response_serializer.is_valid(raise_exception=True)
-        return Response(response_serializer.data)
+        BudgetService.duplicate_budget(serializer.data["uuids"])
+        return Response(status=status.HTTP_201_CREATED)

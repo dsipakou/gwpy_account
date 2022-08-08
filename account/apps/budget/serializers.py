@@ -112,7 +112,7 @@ class CategoryBudgetSerializer(serializers.Serializer):
 
 
 class DuplicateRequestSerializer(serializers.Serializer):
-    type = serializers.CharField()
+    uuids = serializers.ListField()
 
     def validate_type(self, value):
         if value not in constants.ALLOWED_BUDGET_RECURRENT_TYPE:

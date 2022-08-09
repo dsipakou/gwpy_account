@@ -1,6 +1,7 @@
 import copy
 from typing import Dict, List, Optional
 
+from categories import constants as category_constants
 from django.db.models import QuerySet, Sum
 from transactions.entities import (GroupedByCategory, GroupedByParent,
                                    TransactionAccountDetails,
@@ -15,10 +16,10 @@ class TransactionService:
         category_details = TransactionCategoryDetails(
             name=transaction.category.name,
             parent=transaction.category.parent.uuid
-            if not transaction.category.is_income
+            if transaction.category.type == category_constants.EXPENSE
             else "",
             parent_name=transaction.category.parent.name
-            if not transaction.category.is_income
+            if transaction.category.type == category_constants.EXPENSE
             else "",
         )
         account_details = TransactionAccountDetails(

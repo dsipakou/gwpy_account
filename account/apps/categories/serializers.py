@@ -9,7 +9,7 @@ class CategorySerializer(serializers.ModelSerializer):
             "uuid",
             "name",
             "parent",
-            "is_income",
+            "type",
             "created_at",
             "modified_at",
         )

@@ -8,7 +8,7 @@ class CategoryFormAdmin(forms.ModelForm):
     class Meta:
         model = Category
         fields = "__all__"
-        exclude = ("is_income",)
+        exclude = ("type",)
 
 
 class CategoryAdmin(admin.ModelAdmin):
@@ -17,7 +17,7 @@ class CategoryAdmin(admin.ModelAdmin):
         "parent_name",
         "children",
         "budget",
-        "is_income",
+        "type",
         "created_at",
         "modified_at",
     )

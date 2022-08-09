@@ -9,7 +9,9 @@ class BudgetSerializer(serializers.ModelSerializer):
         model = Budget
         fields = (
             "uuid",
+            "user",
             "category",
+            "currency",
             "title",
             "amount",
             "recurrent",
@@ -23,7 +25,9 @@ class BudgetSerializer(serializers.ModelSerializer):
 
 class PlannedBudgetSerializer(serializers.Serializer):
     uuid = serializers.UUIDField()
+    user = serializers.UUIDField(source="user.uuid")
     category = serializers.UUIDField(source="category.uuid")
+    currency = serializers.UUIDField(source="currency.uuid")
     title = serializers.CharField()
     amount = serializers.IntegerField()
     budget_date = serializers.DateField()

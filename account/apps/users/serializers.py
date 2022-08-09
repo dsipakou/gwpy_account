@@ -15,3 +15,8 @@ class UserSerializer(serializers.ModelSerializer):
             "is_active",
             "date_joined",
         )
+
+
+class UserLoginSerializer(serializers.Serializer):
+    email = serializers.CharField()
+    password = serializers.CharField()

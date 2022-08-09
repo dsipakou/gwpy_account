@@ -58,7 +58,9 @@ class PlannedBudgetList(ListAPIView):
 
         queryset = (
             self.get_queryset()
+            .select_related("user")
             .select_related("category")
+            .select_related("currency")
             .filter(budget_date__lte=dateTo, budget_date__gte=dateFrom)
         )
 

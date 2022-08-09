@@ -1,14 +1,11 @@
 import uuid
 
+from categories import constants
 from django.db import models
 from django.db.models import Q
 
 
 class Category(models.Model):
-    class Types(models.TextChoices):
-        INCOME = "INC", "Income"
-        EXPENSE = "EXP", "Expense"
-
     uuid = models.UUIDField(unique=True, default=uuid.uuid4, editable=False)
     name = models.CharField(max_length=128)
     parent = models.ForeignKey(
@@ -19,7 +16,9 @@ class Category(models.Model):
         on_delete=models.CASCADE,
         to_field="uuid",
     )
-    type = models.CharField(max_length=3, choices=Types.choices, default=Types.EXPENSE)
+    type = models.CharField(
+        max_length=3, choices=constants.CATEGORY_TYPES, default=constants.EXPENSE
+    )
     is_income = models.BooleanField(default=False)
     created_at = models.DateTimeField(auto_now_add=True)
     modified_at = models.DateTimeField(auto_now=True)

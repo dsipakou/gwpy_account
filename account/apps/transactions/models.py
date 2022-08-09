@@ -1,6 +1,7 @@
 import textwrap
 import uuid
 
+from categories import constants as category_constants
 from currencies.models import Currency
 from django.db import connection, models
 from rates.models import Rate
@@ -69,8 +70,8 @@ class Transaction(models.Model):
                 LEFT JOIN rates_rate r ON r.currency_id = t.currency_id AND r.rate_date = t.transaction_date
                 LEFT JOIN currencies_currency c ON c.uuid = t.currency_id
                 LEFT JOIN categories_category cc on cc.uuid = t.category_id
-            GROUP BY t.transaction_date, cc.is_income
-            HAVING t.transaction_date >= %s AND t.transaction_date <= %s AND cc.is_income = false
+            GROUP BY t.transaction_date, cc.type
+            HAVING t.transaction_date >= %s AND t.transaction_date <= %s AND cc.type = %s
             ORDER BY t.transaction_date
         ) as t1
             INNER JOIN currencies_currency c1 ON c1.code = %s
@@ -79,7 +80,9 @@ class Transaction(models.Model):
         """
         )
         with connection.cursor() as cursor:
-            cursor.execute(raw_sql, [date_from, date_to, currency_code])
+            cursor.execute(
+                raw_sql, [date_from, date_to, category_constants.EXPENSE, currency_code]
+            )
             grouped_transactions = dictfetchall(cursor)
 
         return grouped_transactions

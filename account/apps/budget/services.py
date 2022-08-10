@@ -185,6 +185,8 @@ class BudgetService:
                 BudgetItem(
                     uuid=budget.uuid,
                     category=budget.category.uuid,
+                    currency=budget.currency.uuid,
+                    user=budget.user.uuid if budget.user else "",
                     title=budget.title,
                     budget_date=budget.budget_date,
                     transactions=transactions,
@@ -257,9 +259,9 @@ class BudgetService:
     def duplicate_budget(cls, uuids: List[str]):
         for uuid in uuids:
             budget_item = Budget.objects.get(uuid=uuid)
-            upcoming_item_date = (
-                budget_item.budget_date
-            )  + RECURRENT_TYPE_MAPPING[budget_item.recurrent]["relative_date"]
+            upcoming_item_date = (budget_item.budget_date) + RECURRENT_TYPE_MAPPING[
+                budget_item.recurrent
+            ]["relative_date"]
             existing_item = Budget.objects.filter(
                 title=budget_item.title,
                 budget_date=upcoming_item_date,

@@ -67,6 +67,7 @@ class BudgetUsageSerializer(serializers.Serializer):
     budget_date = serializers.DateField()
     category = serializers.UUIDField()
     currency = serializers.UUIDField()
+    user = serializers.UUIDField()
     is_completed = serializers.BooleanField()
     recurrent = serializers.CharField()
     description = serializers.CharField(allow_blank=True, allow_null=True)

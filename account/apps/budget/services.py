@@ -186,7 +186,7 @@ class BudgetService:
                     uuid=budget.uuid,
                     category=budget.category.uuid,
                     currency=budget.currency.uuid,
-                    user=budget.user.uuid if budget.user else "",
+                    user=budget.user.uuid,
                     title=budget.title,
                     budget_date=budget.budget_date,
                     transactions=transactions,

@@ -4,6 +4,7 @@ from categories.serializers import CategorySerializer
 from rest_framework.exceptions import ValidationError
 from rest_framework.generics import (ListCreateAPIView,
                                      RetrieveUpdateDestroyAPIView)
+from transactions.models import Transaction
 
 
 class CategoryList(ListCreateAPIView):
@@ -66,4 +67,6 @@ class CategoryDetails(RetrieveUpdateDestroyAPIView):
             raise ValidationError("Cannot delete non empty parent category")
         if Budget.objects.filter(category=instance).exists():
             raise ValidationError("Cannot delete category. There are budgets assigned")
+        if Transaction.objects.filter(category=instance).exists():
+            raise ValidationError("Cannot delete category. There are transactions assigned")
         super().perform_destroy(instance)

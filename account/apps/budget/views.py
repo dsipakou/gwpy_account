@@ -1,11 +1,11 @@
 import datetime
 
 from budget import serializers
-from budget.constants import BudgetDuplicateType
 from budget.models import Budget
 from budget.serializers import DuplicateResponseSerializer
 from budget.services import BudgetService
 from rest_framework import status
+from rest_framework.authentication import TokenAuthentication
 from rest_framework.exceptions import ValidationError
 from rest_framework.generics import (GenericAPIView, ListAPIView,
                                      ListCreateAPIView,
@@ -47,6 +47,7 @@ class BudgetDetails(RetrieveUpdateDestroyAPIView):
 
 
 class PlannedBudgetList(ListAPIView):
+    authentication_classes = (TokenAuthentication,)
     queryset = Budget.objects.all()
     serializer_class = serializers.PlannedBudgetSerializer
 

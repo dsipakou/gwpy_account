@@ -269,6 +269,8 @@ class BudgetService:
             if not existing_item.exists():
                 Budget.objects.create(
                     category=budget_item.category,
+                    currency=budget_item.currency,
+                    user=budget_item.user,
                     title=budget_item.title,
                     amount=budget_item.amount,
                     budget_date=upcoming_item_date,

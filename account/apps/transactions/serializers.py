@@ -10,7 +10,7 @@ class TransactionCategorySerializer(serializers.Serializer):
 
 
 class TransactionAccountSerializer(serializers.Serializer):
-    source = serializers.CharField()
+    title = serializers.CharField()
 
 
 class TransactionSpentInCurrencySerializer(serializers.Serializer):
@@ -92,3 +92,13 @@ class ReportByMonthSerializer(serializers.Serializer):
     month = serializers.CharField()
     day = serializers.IntegerField()
     grouped_amount = serializers.IntegerField()
+
+
+class IncomeSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = Transaction
+        fields = (
+            "transaction_date",
+            "amount",
+            "currency",
+        )

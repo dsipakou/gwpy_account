@@ -1,11 +1,13 @@
 from datetime import date, datetime, timedelta
 
+from categories import constants
 from rest_framework import status
 from rest_framework.generics import (ListAPIView, ListCreateAPIView,
                                      RetrieveUpdateDestroyAPIView)
 from rest_framework.response import Response
 from transactions.models import Transaction
 from transactions.serializers import (GroupedTransactionSerializer,
+                                      IncomeSerializer,
                                       ReportByMonthSerializer,
                                       TransactionCreateSerializer,
                                       TransactionDetailsSerializer,
@@ -67,4 +69,13 @@ class TransactionReportList(ListAPIView):
         currency_code = request.GET.get("currency")
         response = ReportService.get_year_report(date_from, date_to, currency_code)
         serializer = self.get_serializer(response, many=True)
+        return Response(serializer.data)
+
+
+class TransactionIncomeList(ListAPIView):
+    serializer_class = IncomeSerializer
+
+    def list(self, request, *args, **kwargs):
+        data = Transaction.objects.filter(category__type=constants.INCOME)
+        serializer = self.get_serializer(instance=data, many=True)
         return Response(serializer.data)

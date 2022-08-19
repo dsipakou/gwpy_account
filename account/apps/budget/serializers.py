@@ -26,6 +26,7 @@ class BudgetSerializer(serializers.ModelSerializer):
 class PlannedBudgetSerializer(serializers.Serializer):
     uuid = serializers.UUIDField()
     category = serializers.UUIDField(source="category.uuid")
+    user = serializers.UUIDField(source="user.uuid")
     title = serializers.CharField()
     amount = serializers.IntegerField()
     budget_date = serializers.DateField()
@@ -99,6 +100,7 @@ class WeeklyBudgetUsageSerializer(serializers.Serializer):
 
 class BudgetGroupedUsageSerializer(serializers.Serializer):
     uuid = serializers.UUIDField()
+    user = serializers.UUIDField()
     title = serializers.CharField()
     planned = serializers.IntegerField()
     spent_in_original_currency = serializers.FloatField()

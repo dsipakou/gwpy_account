@@ -1,5 +1,5 @@
 import datetime
-from typing import Dict, List
+from typing import Dict, List, Optional
 
 from budget import utils
 from budget.constants import BudgetDuplicateType
@@ -8,6 +8,7 @@ from budget.entities import (BudgetGroupedItem, BudgetItem,
                              MonthUsageSum)
 from budget.exceptions import UnsupportedDuplicateTypeError
 from budget.models import Budget
+from categories import constants
 from categories.models import Category
 from dateutil.relativedelta import relativedelta
 from django.db.models import Count, Prefetch, Q, Sum
@@ -58,7 +59,7 @@ class BudgetService:
 
     @classmethod
     def load_budget(
-        cls, date_from: datetime.date, date_to: datetime.date
+        cls, date_from: datetime.date, date_to: datetime.date, user: Optional[str]
     ) -> List[CategoryItem]:
         cls.start = datetime.datetime.now()
         budgets = (
@@ -73,13 +74,16 @@ class BudgetService:
             .order_by("title")
         )
 
+        if user:
+            budgets = budgets.filter(user__uuid=user)
+
         rates = Rate.objects.filter(
             rate_date__lte=date_to, rate_date__gte=date_from
         ).prefetch_related("currency")
         rates_dict = {(rate.currency.uuid, rate.rate_date): rate.rate for rate in rates}
 
         categories = (
-            Category.objects.filter()
+            Category.objects.filter(parent__isnull=True, type=constants.EXPENSE)
             .prefetch_related(
                 Prefetch("budget_set", queryset=budgets, to_attr="category_budgets")
             )
@@ -99,7 +103,9 @@ class BudgetService:
         return cls.make_categories(categories, rates_dict)
 
     @classmethod
-    def load_weekly_budget(cls, date_from, date_to) -> List[BudgetItem]:
+    def load_weekly_budget(
+        cls, date_from, date_to, user: Optional[str]
+    ) -> List[BudgetItem]:
         budgets = Budget.objects.filter(
             budget_date__lte=date_to, budget_date__gte=date_from
         ).prefetch_related(
@@ -109,6 +115,8 @@ class BudgetService:
                 to_attr="budget_transactions",
             ),
         )
+        if user:
+            budgets = budgets.filter(user__uuid=user)
 
         rates = Rate.objects.filter(rate_date__lte=date_to, rate_date__gte=date_from)
         rates_dict = {(rate.currency.uuid, rate.rate_date): rate.rate for rate in rates}
@@ -147,6 +155,7 @@ class BudgetService:
             if budget["title"] not in grouped_dict:
                 grouped_dict[budget["title"]] = {
                     "uuid": budget["uuid"],
+                    "user": budget["user"],
                     "title": budget["title"],
                     "planned": budget["planned"],
                     "spent_in_base_currency": budget["spent_in_base_currency"],

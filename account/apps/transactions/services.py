@@ -23,7 +23,7 @@ class TransactionService:
             else "",
         )
         account_details = TransactionAccountDetails(
-            source=transaction.account.source,
+            title=transaction.account.title,
         )
         spent_details = {
             rate.currency.code: TransactionSpentInCurrencyDetails(

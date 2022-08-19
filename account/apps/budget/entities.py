@@ -13,6 +13,7 @@ class BudgetTransactionItem(TypedDict):
 
 class BudgetItem(TypedDict):
     uuid: UUID
+    user: UUID
     category: UUID
     title: str
     budget_date: datetime.date
@@ -30,6 +31,7 @@ class BudgetItem(TypedDict):
 
 class BudgetGroupedItem(TypedDict):
     uuid: UUID
+    user: UUID
     title: str
     planned: float
     spent_in_base_currency: float
@@ -39,6 +41,7 @@ class BudgetGroupedItem(TypedDict):
 
 class CategoryItem(TypedDict):
     uuid: UUID
+    user: UUID
     category_name: str
     budgets: List[BudgetGroupedItem]
     planned: float

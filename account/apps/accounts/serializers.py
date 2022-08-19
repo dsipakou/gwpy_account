@@ -9,8 +9,8 @@ class AccountSerializer(serializers.ModelSerializer):
         fields = (
             "uuid",
             "user",
-            "source",
-            "amount",
+            "title",
+            "category",
             "description",
             "is_main",
             "created_at",

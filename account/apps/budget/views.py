@@ -77,9 +77,9 @@ class ActualUsageBudgetList(ListAPIView):
             "dateFrom", datetime.date.today() - datetime.timedelta(days=30)
         )
         date_to = request.GET.get("dateTo", datetime.date.today())
+        user = request.GET.get("user")
 
-        start = datetime.datetime.now()
-        categories = BudgetService.load_budget(date_from, date_to)
+        categories = BudgetService.load_budget(date_from, date_to, user)
 
         serializer = self.get_serializer(categories, many=True)
         return Response(serializer.data)
@@ -94,8 +94,9 @@ class WeeklyUsageList(ListAPIView):
             "dateFrom", datetime.date.today() - datetime.timedelta(days=30)
         )
         date_to = request.GET.get("dateTo", datetime.date.today())
+        user = request.GET.get("user")
 
-        budgets = BudgetService.load_weekly_budget(date_from, date_to)
+        budgets = BudgetService.load_weekly_budget(date_from, date_to, user)
 
         serializer = self.get_serializer(budgets, many=True)
         return Response(serializer.data)

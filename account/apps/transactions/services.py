@@ -1,16 +1,29 @@
 import copy
 from typing import Dict, List, Optional
+from uuid import UUID
 
 from categories import constants as category_constants
 from django.db.models import QuerySet, Sum
+from rates.models import Rate
 from transactions.entities import (GroupedByCategory, GroupedByParent,
                                    TransactionAccountDetails,
                                    TransactionCategoryDetails, TransactionItem,
                                    TransactionSpentInCurrencyDetails)
-from transactions.models import Transaction
+from transactions.models import Transaction, TransactionAmount
 
 
 class TransactionService:
+    @classmethod
+    def create_transaction_multicurrency_amount(cls, uuid: UUID):
+        transaction = Transaction.objects.get(uuid=uuid)
+        rates_on_date = Rate.objects.filter(rate_date=transaction.transaction_date)
+        for rate in rates_on_date:
+            object, created = TransactionAmount.objects.update_or_create(
+                currency=rate.currency,
+                transaction=transaction,
+                amount=transaction.amount * rate.rate,
+            )
+
     @classmethod
     def get_transaction(cls, transaction: Transaction) -> Optional[Transaction]:
         category_details = TransactionCategoryDetails(

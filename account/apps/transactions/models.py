@@ -116,8 +116,10 @@ class Transaction(models.Model):
 
 class TransactionAmount(models.Model):
     uuid = models.UUIDField(unique=True, default=uuid.uuid4, editable=False)
-    transaction = models.ForeignKey(Transaction, on_delete=models.CASCADE)
-    currency = models.ForeignKey(Currency, on_delete=models.DO_NOTHING)
+    transaction = models.ForeignKey(
+        Transaction, to_field="uuid", on_delete=models.CASCADE
+    )
+    currency = models.ForeignKey(Currency, to_field="uuid", on_delete=models.DO_NOTHING)
     amount = models.FloatField(default=0)
 
     class Meta:

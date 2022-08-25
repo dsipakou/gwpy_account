@@ -30,6 +30,7 @@ class TransactionList(ListCreateAPIView):
         instance = serializer.save()
         headers = self.get_success_headers(serializer.data)
 
+        TransactionService.create_transaction_multicurrency_amount(instance.uuid)
         transaction = TransactionService.load_transaction(instance.uuid)
         serializer = self.get_serializer(transaction)
         return Response(

@@ -15,13 +15,37 @@ from transactions.models import Transaction, TransactionAmount
 class TransactionService:
     @classmethod
     def create_transaction_multicurrency_amount(cls, uuid: UUID):
-        transaction = Transaction.objects.get(uuid=uuid)
+        transaction = Transaction.objects.select_related("currency").get(uuid=uuid)
         rates_on_date = Rate.objects.filter(rate_date=transaction.transaction_date)
         for rate in rates_on_date:
-            object, created = TransactionAmount.objects.update_or_create(
+            if transaction.currency == rate.currency:
+                # current rate currency and transaction currency are the same no need to modify amount
+                amount = transaction.amount
+            elif transaction.currency.is_base:
+                # transaction currency is base currency so just divide - no need to convert to base currency beforehand
+                amount = transaction.amount / rate.rate
+            else:
+                # need to convert amount to base currency first than to current rate currency
+                current_rate = rates_on_date.get(currency=transaction.currency)
+                amount = transaction.amount * current_rate.rate / rate.rate
+            TransactionAmount.objects.update_or_create(
                 currency=rate.currency,
                 transaction=transaction,
-                amount=transaction.amount * rate.rate,
+                amount=amount,
+            )
+        # Create a record for base currency as well
+        if transaction.currency.is_base:
+            TransactionAmount.objects.update_or_create(
+                currency=transaction.currency,
+                transaction=transaction,
+                amount=transaction.amount,
+            )
+        elif rates_on_date:
+            TransactionAmount.objects.update_or_create(
+                currency=rates_on_date[0].base_currency,
+                transaction=transaction,
+                amount=transaction.amount
+                * rates_on_date.get(currency=transaction.currency).rate,
             )
 
     @classmethod

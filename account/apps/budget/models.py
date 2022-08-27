@@ -1,9 +1,7 @@
 import uuid
 
 from budget.constants import BudgetDuplicateType
-from currencies.models import Currency
 from django.db import models
-from transactions.models import Transaction
 
 
 class Budget(models.Model):
@@ -34,11 +32,5 @@ class Budget(models.Model):
 
 class BudgetAmount(models.Model):
     uuid = models.UUIDField(unique=True, default=uuid.uuid4, editable=False)
-    transaction = models.ForeignKey(
-        Transaction, to_field="uuid", on_delete=models.CASCADE
-    )
-    currency = models.ForeignKey(Currency, to_field="uuid", on_delete=models.DO_NOTHING)
-    amount = models.FloatField(default=0)
-
-    class Meta:
-        unique_together = ["transaction", "currency"]
+    budget = models.OneToOneField(Budget, to_field="uuid", on_delete=models.CASCADE)
+    amount_map = models.JSONField(default=dict)

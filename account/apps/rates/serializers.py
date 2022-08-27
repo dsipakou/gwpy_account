@@ -17,6 +17,17 @@ class RateSerializer(serializers.ModelSerializer):
         )
 
 
+class BatchedRateItemSerializer(serializers.Serializer):
+    code = serializers.CharField()
+    rate = serializers.CharField()
+
+
+class CreateBatchedRateSerializer(serializers.Serializer):
+    rate_date = serializers.DateField()
+    base_currency = serializers.CharField()
+    items = BatchedRateItemSerializer(many=True)
+
+
 class RateChartDataSerializer(serializers.Serializer):
     rate_date = serializers.DateField()
     rate = serializers.DecimalField(max_digits=10, decimal_places=5)

@@ -15,6 +15,7 @@ from transactions.models import Transaction, TransactionAmount
 class TransactionService:
     @classmethod
     def create_transaction_multicurrency_amount(cls, uuid: UUID):
+        amount_mapping = {}
         transaction = Transaction.objects.select_related("currency").get(uuid=uuid)
         rates_on_date = Rate.objects.filter(rate_date=transaction.transaction_date)
         for rate in rates_on_date:
@@ -28,25 +29,18 @@ class TransactionService:
                 # need to convert amount to base currency first than to current rate currency
                 current_rate = rates_on_date.get(currency=transaction.currency)
                 amount = transaction.amount * current_rate.rate / rate.rate
-            TransactionAmount.objects.update_or_create(
-                currency=rate.currency,
-                transaction=transaction,
-                amount=amount,
-            )
+            amount_mapping |= {rate.currency.code: amount}
         # Create a record for base currency as well
         if transaction.currency.is_base:
-            TransactionAmount.objects.update_or_create(
-                currency=transaction.currency,
-                transaction=transaction,
-                amount=transaction.amount,
-            )
+            amount_mapping |= {transaction.currency.code: transaction.amount}
         elif rates_on_date:
-            TransactionAmount.objects.update_or_create(
-                currency=rates_on_date[0].base_currency,
-                transaction=transaction,
-                amount=transaction.amount
-                * rates_on_date.get(currency=transaction.currency).rate,
-            )
+            amount_mapping |= {
+                rates_on_date[0].base_currency.code: transaction.amount
+                * rates_on_date.get(currency=transaction.currency).rate
+            }
+        TransactionAmount.objects.update_or_create(
+            transaction=transaction, defaults={"amount_map": amount_mapping}
+        )
 
     @classmethod
     def get_transaction(cls, transaction: Transaction) -> Optional[Transaction]:

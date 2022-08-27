@@ -17,16 +17,24 @@ class BudgetList(ListCreateAPIView):
     queryset = Budget.objects.select_related("category").all()
     serializer_class = serializers.BudgetSerializer
 
-    def perform_create(self, serializer):
+    def create(self, request, *args, **kwargs):
         """Check if category is parent category
 
         Raises:
             ValidationError: when category is not parent category
         """
-
+        serializer = self.get_serializer(data=request.data)
+        serializer.is_valid(raise_exception=True)
         if serializer.validated_data["category"].parent is not None:
             raise ValidationError("Only parent categories can be used for budgets.")
-        super().perform_create(serializer)
+        instance = serializer.save()
+        headers = self.get_success_headers(serializer.data)
+
+        BudgetService.create_budget_multicurrency_amount([instance.uuid])
+
+        return Response(
+            serializer.data, status=status.HTTP_201_CREATED, headers=headers
+        )
 
 
 class BudgetDetails(RetrieveUpdateDestroyAPIView):

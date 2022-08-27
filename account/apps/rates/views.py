@@ -4,10 +4,13 @@ from currencies.models import Currency
 from html5lib import serialize
 from rates.filters import DateFilter
 from rates.models import Rate
-from rates.serializers import (RateChartDataSerializer, RateChartSerializer,
+from rates.serializers import (CreateBatchedRateSerializer,
+                               RateChartDataSerializer, RateChartSerializer,
                                RateSerializer)
+from rates.services import RateService
 from rates.utils import generate_date_seq
-from rest_framework.generics import (ListAPIView, ListCreateAPIView,
+from rest_framework.generics import (CreateAPIView, ListAPIView,
+                                     ListCreateAPIView,
                                      RetrieveUpdateDestroyAPIView)
 from rest_framework.response import Response
 
@@ -15,6 +18,16 @@ from rest_framework.response import Response
 class RateList(ListCreateAPIView):
     queryset = Rate.objects.order_by("rate_date").reverse()[:180]
     serializer_class = RateSerializer
+
+
+class CreateBatchedRate(CreateAPIView):
+    serializer_class = CreateBatchedRateSerializer
+
+    def create(self, request, *args, **kwards):
+        serializer = self.get_serializer(data=request.data)
+        serializer.is_valid(raise_exception=True)
+        RateService.create_batched_rates(serializer.data)
+        return Response(serializer.data)
 
 
 class RateDayData(ListAPIView):

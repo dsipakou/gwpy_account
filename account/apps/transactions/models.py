@@ -116,11 +116,7 @@ class Transaction(models.Model):
 
 class TransactionAmount(models.Model):
     uuid = models.UUIDField(unique=True, default=uuid.uuid4, editable=False)
-    transaction = models.ForeignKey(
+    transaction = models.OneToOneField(
         Transaction, to_field="uuid", on_delete=models.CASCADE
     )
-    currency = models.ForeignKey(Currency, to_field="uuid", on_delete=models.DO_NOTHING)
-    amount = models.FloatField(default=0)
-
-    class Meta:
-        unique_together = ["transaction", "currency"]
+    amount_map = models.JSONField(default=dict)

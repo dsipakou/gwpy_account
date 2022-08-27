@@ -1,5 +1,6 @@
 import datetime
 from typing import Dict, List, Optional
+from uuid import UUID
 
 from budget import utils
 from budget.constants import BudgetDuplicateType
@@ -7,7 +8,7 @@ from budget.entities import (BudgetGroupedItem, BudgetItem,
                              BudgetTransactionItem, CategoryItem,
                              MonthUsageSum)
 from budget.exceptions import UnsupportedDuplicateTypeError
-from budget.models import Budget
+from budget.models import Budget, BudgetAmount
 from categories import constants
 from categories.models import Category
 from dateutil.relativedelta import relativedelta
@@ -30,6 +31,39 @@ RECURRENT_TYPE_MAPPING = {
 
 
 class BudgetService:
+    @classmethod
+    def create_budget_multicurrency_amount(cls, uuids: List[UUID]):
+        budget_amounts_map = dict()
+        budgets = Budget.objects.select_related("currency").filter(uuid__in=uuids)
+        dates = budgets.values_list("budget_date", flat=True).distinct()
+        rates_on_date = Rate.objects.filter(rate_date__in=dates)
+        for budget in budgets:
+            for rate in rates_on_date:
+                if budget.currency == rate.currency:
+                    # current rate currency and budget currency are the same no need to modify amount
+                    amount = budget.amount
+                elif budget.currency.is_base:
+                    # budget currency is base currency so just divide - no need to convert to base currency beforehand
+                    amount = budget.amount / rate.rate
+                else:
+                    # need to convert amount to base currency first than to current rate currency
+                    current_rate = rates_on_date.get(currency=budget.currency)
+                    amount = budget.amount * current_rate.rate / rate.rate
+                budget_amounts_map |= {rate.currency.code: amount}
+
+            # Create a record for base currency as well
+            if budget.currency.is_base:
+                budget_amounts_map |= {budget.currency.code: budget.amount}
+            elif rates_on_date:
+                budget_amounts_map |= {
+                    rates_on_date[0].base_currency.code: budget.amount
+                    * rates_on_date.get(currency=budget.currency).rate
+                }
+
+            BudgetAmount.objects.update_or_create(
+                budget=budget, defaults={"amount_map": budget_amounts_map}
+            )
+
     @classmethod
     def get_archive(
         cls, current_date: datetime.date, category_uuid: str

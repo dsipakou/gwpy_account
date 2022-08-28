@@ -2,6 +2,7 @@
 
 from django.db import migrations
 
+
 def set_budget_currency(apps, schema_editor):
     budget_items = apps.get_model("budget", "Budget")
     qs = budget_items.objects.filter(currency=None)
@@ -15,7 +16,7 @@ def set_budget_currency(apps, schema_editor):
 class Migration(migrations.Migration):
 
     dependencies = [
-        ('budget', '0006_budget_user'),
+        ("budget", "0006_budget_user"),
     ]
 
     operations = [

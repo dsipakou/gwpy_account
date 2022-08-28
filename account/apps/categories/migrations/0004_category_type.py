@@ -6,13 +6,17 @@ from django.db import migrations, models
 class Migration(migrations.Migration):
 
     dependencies = [
-        ('categories', '0003_remove_category_orig_pk'),
+        ("categories", "0003_remove_category_orig_pk"),
     ]
 
     operations = [
         migrations.AddField(
-            model_name='category',
-            name='type',
-            field=models.CharField(choices=[('INC', 'Income'), ('EXP', 'Expense')], default='EXP', max_length=3),
+            model_name="category",
+            name="type",
+            field=models.CharField(
+                choices=[("INC", "Income"), ("EXP", "Expense")],
+                default="EXP",
+                max_length=3,
+            ),
         ),
     ]

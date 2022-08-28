@@ -1,8 +1,10 @@
-from typing import TypedDict, List
+from typing import List, TypedDict
+
 
 class RateItem(TypedDict):
     currency: str
     rate: str
+
 
 class BatchedRateRequest(TypedDict):
     base_currency: str

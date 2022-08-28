@@ -8,17 +8,17 @@ class Migration(migrations.Migration):
 
     dependencies = [
         migrations.swappable_dependency(settings.AUTH_USER_MODEL),
-        ('accounts', '0004_remove_account_amount_account_assigned_category'),
+        ("accounts", "0004_remove_account_amount_account_assigned_category"),
     ]
 
     operations = [
         migrations.RenameField(
-            model_name='account',
-            old_name='source',
-            new_name='title',
+            model_name="account",
+            old_name="source",
+            new_name="title",
         ),
         migrations.AlterUniqueTogether(
-            name='account',
-            unique_together={('user', 'title')},
+            name="account",
+            unique_together={("user", "title")},
         ),
     ]

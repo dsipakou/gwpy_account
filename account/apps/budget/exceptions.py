@@ -1,4 +1,5 @@
-__all__ = ("UnsupportedDuplicateTypeError")
+__all__ = "UnsupportedDuplicateTypeError"
+
 
 class UnsupportedDuplicateTypeError(Exception):
     pass

@@ -14,33 +14,40 @@ from transactions.models import Transaction, TransactionAmount
 
 class TransactionService:
     @classmethod
-    def create_transaction_multicurrency_amount(cls, uuid: UUID):
-        amount_mapping = {}
-        transaction = Transaction.objects.select_related("currency").get(uuid=uuid)
-        rates_on_date = Rate.objects.filter(rate_date=transaction.transaction_date)
-        for rate in rates_on_date:
-            if transaction.currency == rate.currency:
-                # current rate currency and transaction currency are the same no need to modify amount
-                amount = transaction.amount
-            elif transaction.currency.is_base:
-                # transaction currency is base currency so just divide - no need to convert to base currency beforehand
-                amount = transaction.amount / rate.rate
-            else:
-                # need to convert amount to base currency first than to current rate currency
-                current_rate = rates_on_date.get(currency=transaction.currency)
-                amount = transaction.amount * current_rate.rate / rate.rate
-            amount_mapping |= {rate.currency.code: amount}
-        # Create a record for base currency as well
-        if transaction.currency.is_base:
-            amount_mapping |= {transaction.currency.code: transaction.amount}
-        elif rates_on_date:
-            amount_mapping |= {
-                rates_on_date[0].base_currency.code: transaction.amount
-                * rates_on_date.get(currency=transaction.currency).rate
-            }
-        TransactionAmount.objects.update_or_create(
-            transaction=transaction, defaults={"amount_map": amount_mapping}
+    def create_transaction_multicurrency_amount(cls, uuids: List[UUID]):
+        amount_mapping = dict()
+        transactions = Transaction.objects.select_related("currency").filter(
+            uuid__in=uuids
         )
+        dates = transactions.values_list("transaction_date", flat=True).distinct()
+        rates_on_date = Rate.objects.filter(rate_date__in=dates)
+        for transaction in transactions:
+            for rate in rates_on_date:
+                if transaction.currency == rate.currency:
+                    # current rate currency and transaction currency are the same no need to modify amount
+                    amount = transaction.amount
+                elif transaction.currency.is_base:
+                    # transaction currency is base currency so just divide - no need to convert to base currency beforehand
+                    amount = round(transaction.amount / rate.rate, 5)
+                else:
+                    # need to convert amount to base currency first than to current rate currency
+                    current_rate = rates_on_date.get(currency=transaction.currency)
+                    amount = round(
+                        transaction.amount * current_rate.rate / rate.rate, 5
+                    )
+                amount_mapping[rate.currency.code]: amount
+            # Create a record for base currency as well
+            if transaction.currency.is_base:
+                amount_mapping[transaction.currency.code]: transaction.amount
+            elif rates_on_date:
+                amount = (
+                    transaction.amount
+                    * rates_on_date.get(currency=transaction.currency).rate
+                )
+                amount_mapping[rates_on_date[0].base_currency.code]: round(amount, 5)
+            TransactionAmount.objects.update_or_create(
+                transaction=transaction, defaults={"amount_map": amount_mapping}
+            )
 
     @classmethod
     def get_transaction(cls, transaction: Transaction) -> Optional[Transaction]:

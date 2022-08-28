@@ -68,5 +68,7 @@ class CategoryDetails(RetrieveUpdateDestroyAPIView):
         if Budget.objects.filter(category=instance).exists():
             raise ValidationError("Cannot delete category. There are budgets assigned")
         if Transaction.objects.filter(category=instance).exists():
-            raise ValidationError("Cannot delete category. There are transactions assigned")
+            raise ValidationError(
+                "Cannot delete category. There are transactions assigned"
+            )
         super().perform_destroy(instance)

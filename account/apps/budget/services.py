@@ -44,21 +44,23 @@ class BudgetService:
                     amount = budget.amount
                 elif budget.currency.is_base:
                     # budget currency is base currency so just divide - no need to convert to base currency beforehand
-                    amount = budget.amount / rate.rate
+                    amount = round(budget.amount / rate.rate, 5)
                 else:
                     # need to convert amount to base currency first than to current rate currency
                     current_rate = rates_on_date.get(currency=budget.currency)
-                    amount = budget.amount * current_rate.rate / rate.rate
-                budget_amounts_map |= {rate.currency.code: amount}
+                    amount = round(budget.amount * current_rate.rate / rate.rate, 5)
+                budget_amounts_map[rate.currency.code]: amount
 
             # Create a record for base currency as well
             if budget.currency.is_base:
-                budget_amounts_map |= {budget.currency.code: budget.amount}
+                budget_amounts_map[budget.currency.code]: budget.amount
             elif rates_on_date:
-                budget_amounts_map |= {
-                    rates_on_date[0].base_currency.code: budget.amount
-                    * rates_on_date.get(currency=budget.currency).rate
-                }
+                amount = (
+                    budget.amount * rates_on_date.get(currency=budget.currency).rate
+                )
+                budget_amounts_map[rates_on_date[0].base_currency.code]: round(
+                    amount, 5
+                )
 
             BudgetAmount.objects.update_or_create(
                 budget=budget, defaults={"amount_map": budget_amounts_map}

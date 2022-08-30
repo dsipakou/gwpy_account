@@ -49,16 +49,16 @@ class BudgetService:
                     # need to convert amount to base currency first than to current rate currency
                     current_rate = rates_on_date.get(currency=budget.currency)
                     amount = round(budget.amount * current_rate.rate / rate.rate, 5)
-                budget_amounts_map[rate.currency.code]: amount
+                budget_amounts_map[rate.currency.code] = amount
 
             # Create a record for base currency as well
             if budget.currency.is_base:
-                budget_amounts_map[budget.currency.code]: budget.amount
+                budget_amounts_map[budget.currency.code] = budget.amount
             elif rates_on_date:
                 amount = (
                     budget.amount * rates_on_date.get(currency=budget.currency).rate
                 )
-                budget_amounts_map[rates_on_date[0].base_currency.code]: round(
+                budget_amounts_map[rates_on_date[0].base_currency.code] = round(
                     amount, 5
                 )
 
@@ -312,7 +312,7 @@ class BudgetService:
                 budget_date=upcoming_item_date,
             )
             if not existing_item.exists():
-                Budget.objects.create(
+                budget = Budget.objects.create(
                     category=budget_item.category,
                     currency=budget_item.currency,
                     user=budget_item.user,
@@ -322,3 +322,5 @@ class BudgetService:
                     description=budget_item.description,
                     recurrent=budget_item.recurrent,
                 )
+
+                cls.create_budget_multicurrency_amount([budget.uuid])

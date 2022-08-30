@@ -8,7 +8,7 @@ from transactions.models import Transaction
 
 
 class CategoryList(ListCreateAPIView):
-    queryset = Category.objects.all().order_by("name")
+    queryset = Category.objects.all().select_related("parent").order_by("name")
     serializer_class = CategorySerializer
 
     def perform_create(self, serializer):

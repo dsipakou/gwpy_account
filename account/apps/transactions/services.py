@@ -3,7 +3,7 @@ from typing import Dict, List, Optional
 from uuid import UUID
 
 from categories import constants as category_constants
-from django.db.models import QuerySet, Sum
+from django.db.models import Prefetch, QuerySet
 from rates.models import Rate
 from transactions.entities import (GroupedByCategory, GroupedByParent,
                                    TransactionAccountDetails,
@@ -35,16 +35,16 @@ class TransactionService:
                     amount = round(
                         transaction.amount * current_rate.rate / rate.rate, 5
                     )
-                amount_mapping[rate.currency.code]: amount
+                amount_mapping[rate.currency.code] = amount
             # Create a record for base currency as well
             if transaction.currency.is_base:
-                amount_mapping[transaction.currency.code]: transaction.amount
+                amount_mapping[transaction.currency.code] = transaction.amount
             elif rates_on_date:
                 amount = (
                     transaction.amount
                     * rates_on_date.get(currency=transaction.currency).rate
                 )
-                amount_mapping[rates_on_date[0].base_currency.code]: round(amount, 5)
+                amount_mapping[rates_on_date[0].base_currency.code] = round(amount, 5)
             TransactionAmount.objects.update_or_create(
                 transaction=transaction, defaults={"amount_map": amount_mapping}
             )

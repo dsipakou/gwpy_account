@@ -28,7 +28,7 @@ class TransactionItem(TypedDict):
     currency: UUID
     amount: float
     spent_in_base_currency: float
-    spent_in_currencies: Dict[str, TransactionSpentInCurrencyDetails]
+    spent_in_currencies: Dict[str, float]
     account: UUID
     account_details: TransactionAccountDetails
     description: str

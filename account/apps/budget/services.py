@@ -4,9 +4,13 @@ from uuid import UUID
 
 from budget import utils
 from budget.constants import BudgetDuplicateType
-from budget.entities import (BudgetGroupedItem, BudgetItem,
-                             BudgetTransactionItem, CategoryItem,
-                             MonthUsageSum)
+from budget.entities import (
+    BudgetGroupedItem,
+    BudgetItem,
+    BudgetTransactionItem,
+    CategoryItem,
+    MonthUsageSum,
+)
 from budget.exceptions import UnsupportedDuplicateTypeError
 from budget.models import Budget, BudgetAmount
 from categories import constants
@@ -15,6 +19,7 @@ from dateutil.relativedelta import relativedelta
 from django.db.models import Count, Prefetch, Q, Sum
 from django.db.models.functions import TruncMonth
 from transactions.models import Rate, Transaction
+from rates.utils import generate_amount_map
 
 RECURRENT_TYPE_MAPPING = {
     BudgetDuplicateType.MONTHLY: {
@@ -33,37 +38,14 @@ RECURRENT_TYPE_MAPPING = {
 class BudgetService:
     @classmethod
     def create_budget_multicurrency_amount(cls, uuids: List[UUID]):
-        budget_amounts_map = dict()
         budgets = Budget.objects.select_related("currency").filter(uuid__in=uuids)
         dates = budgets.values_list("budget_date", flat=True).distinct()
         rates_on_date = Rate.objects.filter(rate_date__in=dates)
         for budget in budgets:
-            for rate in rates_on_date:
-                if budget.currency == rate.currency:
-                    # current rate currency and budget currency are the same no need to modify amount
-                    amount = budget.amount
-                elif budget.currency.is_base:
-                    # budget currency is base currency so just divide - no need to convert to base currency beforehand
-                    amount = round(budget.amount / rate.rate, 5)
-                else:
-                    # need to convert amount to base currency first than to current rate currency
-                    current_rate = rates_on_date.get(currency=budget.currency)
-                    amount = round(budget.amount * current_rate.rate / rate.rate, 5)
-                budget_amounts_map[rate.currency.code] = amount
-
-            # Create a record for base currency as well
-            if budget.currency.is_base:
-                budget_amounts_map[budget.currency.code] = budget.amount
-            elif rates_on_date:
-                amount = (
-                    budget.amount * rates_on_date.get(currency=budget.currency).rate
-                )
-                budget_amounts_map[rates_on_date[0].base_currency.code] = round(
-                    amount, 5
-                )
+            amount_map = generate_amount_map(budget, rates_on_date)
 
             BudgetAmount.objects.update_or_create(
-                budget=budget, defaults={"amount_map": budget_amounts_map}
+                budget=budget, defaults={"amount_map": amount_map}
             )
 
     @classmethod

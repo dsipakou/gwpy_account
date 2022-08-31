@@ -5,10 +5,15 @@ from uuid import UUID
 from categories import constants as category_constants
 from django.db.models import Prefetch, QuerySet
 from rates.models import Rate
-from transactions.entities import (GroupedByCategory, GroupedByParent,
-                                   TransactionAccountDetails,
-                                   TransactionCategoryDetails, TransactionItem,
-                                   TransactionSpentInCurrencyDetails)
+from rates.utils import generate_amount_map
+from transactions.entities import (
+    GroupedByCategory,
+    GroupedByParent,
+    TransactionAccountDetails,
+    TransactionCategoryDetails,
+    TransactionItem,
+    TransactionSpentInCurrencyDetails,
+)
 from transactions.models import Transaction, TransactionAmount
 
 
@@ -22,29 +27,8 @@ class TransactionService:
         dates = transactions.values_list("transaction_date", flat=True).distinct()
         rates_on_date = Rate.objects.filter(rate_date__in=dates)
         for transaction in transactions:
-            for rate in rates_on_date:
-                if transaction.currency == rate.currency:
-                    # current rate currency and transaction currency are the same no need to modify amount
-                    amount = transaction.amount
-                elif transaction.currency.is_base:
-                    # transaction currency is base currency so just divide - no need to convert to base currency beforehand
-                    amount = round(transaction.amount / rate.rate, 5)
-                else:
-                    # need to convert amount to base currency first than to current rate currency
-                    current_rate = rates_on_date.get(currency=transaction.currency)
-                    amount = round(
-                        transaction.amount * current_rate.rate / rate.rate, 5
-                    )
-                amount_mapping[rate.currency.code] = amount
-            # Create a record for base currency as well
-            if transaction.currency.is_base:
-                amount_mapping[transaction.currency.code] = transaction.amount
-            elif rates_on_date:
-                amount = (
-                    transaction.amount
-                    * rates_on_date.get(currency=transaction.currency).rate
-                )
-                amount_mapping[rates_on_date[0].base_currency.code] = round(amount, 5)
+            amount_mapping = generate_amount_map(transaction, rates_on_date)
+
             TransactionAmount.objects.update_or_create(
                 transaction=transaction, defaults={"amount_map": amount_mapping}
             )
@@ -63,14 +47,9 @@ class TransactionService:
         account_details = TransactionAccountDetails(
             title=transaction.account.title,
         )
-        spent_details = {
-            rate.currency.code: TransactionSpentInCurrencyDetails(
-                amount=transaction.spent_in_base_currency / rate.rate,
-                sign=rate.currency.sign,
-                currency=rate.currency.uuid,
-            )
-            for rate in transaction.to_date_rates
-        }
+        spent_details = TransactionSpentInCurrencyDetails(
+            transaction.calculated_amount.amount_map
+        )
 
         return TransactionItem(
             uuid=transaction.uuid,
@@ -173,6 +152,7 @@ class TransactionService:
         qs = (
             Transaction.objects.all()
             .order_by(f"-{order_by}")
+            .prefetch_related("calculated_amount")
             .select_related("category", "account")[:limit]
         )
 

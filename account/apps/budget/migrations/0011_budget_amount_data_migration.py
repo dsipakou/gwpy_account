@@ -30,9 +30,7 @@ def generate_budget_pricing(apps, schema_editor):
             budget_amounts_map[budget.currency.code]: budget.amount
         elif rates_on_date:
             amount = budget.amount * rates_on_date.get(currency=budget.currency).rate
-            budget_amounts_map[
-                rates_on_date[0].base_currency.code
-            ]: round(amount, 5)
+            budget_amounts_map[rates_on_date[0].base_currency.code]: round(amount, 5)
 
         BudgetAmount.objects.update_or_create(
             budget=budget, defaults={"amount_map": budget_amounts_map}

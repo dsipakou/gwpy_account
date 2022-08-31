@@ -35,7 +35,7 @@ def generate_transaction_pricing(apps, schema_editor):
             )
             amount_mapping[rates_on_date[0].base_currency.code] = round(amount, 5)
         if counter % 1000 == 0:
-            print(f'{counter} of {qs.count()} migrated')
+            print(f"{counter} of {qs.count()} migrated")
         counter += 1
         TransactionAmount.objects.update_or_create(
             transaction=transaction, defaults={"amount_map": amount_mapping}

@@ -2,8 +2,7 @@ from currencies.models import Currency
 from currencies.serializers import CurrencySerializer
 from rates.models import Rate
 from rest_framework.exceptions import ValidationError
-from rest_framework.generics import (ListCreateAPIView,
-                                     RetrieveUpdateDestroyAPIView)
+from rest_framework.generics import ListCreateAPIView, RetrieveUpdateDestroyAPIView
 
 
 class CurrencyList(ListCreateAPIView):

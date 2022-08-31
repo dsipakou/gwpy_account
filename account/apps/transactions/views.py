@@ -2,16 +2,21 @@ from datetime import date, datetime, timedelta
 
 from categories import constants
 from rest_framework import status
-from rest_framework.generics import (ListAPIView, ListCreateAPIView,
-                                     RetrieveUpdateDestroyAPIView)
+from rest_framework.generics import (
+    ListAPIView,
+    ListCreateAPIView,
+    RetrieveUpdateDestroyAPIView,
+)
 from rest_framework.response import Response
 from transactions.models import Transaction
-from transactions.serializers import (GroupedTransactionSerializer,
-                                      IncomeSerializer,
-                                      ReportByMonthSerializer,
-                                      TransactionCreateSerializer,
-                                      TransactionDetailsSerializer,
-                                      TransactionSerializer)
+from transactions.serializers import (
+    GroupedTransactionSerializer,
+    IncomeSerializer,
+    ReportByMonthSerializer,
+    TransactionCreateSerializer,
+    TransactionDetailsSerializer,
+    TransactionSerializer,
+)
 from transactions.services import ReportService, TransactionService
 
 

@@ -4,14 +4,20 @@ from currencies.models import Currency
 from html5lib import serialize
 from rates.filters import DateFilter
 from rates.models import Rate
-from rates.serializers import (CreateBatchedRateSerializer,
-                               RateChartDataSerializer, RateChartSerializer,
-                               RateSerializer)
+from rates.serializers import (
+    CreateBatchedRateSerializer,
+    RateChartDataSerializer,
+    RateChartSerializer,
+    RateSerializer,
+)
 from rates.services import RateService
 from rates.utils import generate_date_seq
-from rest_framework.generics import (CreateAPIView, ListAPIView,
-                                     ListCreateAPIView,
-                                     RetrieveUpdateDestroyAPIView)
+from rest_framework.generics import (
+    CreateAPIView,
+    ListAPIView,
+    ListCreateAPIView,
+    RetrieveUpdateDestroyAPIView,
+)
 from rest_framework.response import Response
 
 

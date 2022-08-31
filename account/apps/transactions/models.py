@@ -122,7 +122,7 @@ class TransactionAmount(models.Model):
     uuid = models.UUIDField(unique=True, default=uuid.uuid4, editable=False)
     transaction = models.OneToOneField(
         Transaction,
-        related_name="currencies_calculated",
+        related_name="calculated_amount",
         to_field="uuid",
         on_delete=models.CASCADE,
     )

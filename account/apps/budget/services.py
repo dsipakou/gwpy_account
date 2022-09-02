@@ -4,13 +4,9 @@ from uuid import UUID
 
 from budget import utils
 from budget.constants import BudgetDuplicateType
-from budget.entities import (
-    BudgetGroupedItem,
-    BudgetItem,
-    BudgetTransactionItem,
-    CategoryItem,
-    MonthUsageSum,
-)
+from budget.entities import (BudgetGroupedItem, BudgetItem,
+                             BudgetTransactionItem, CategoryItem,
+                             MonthUsageSum)
 from budget.exceptions import UnsupportedDuplicateTypeError
 from budget.models import Budget, BudgetAmount
 from categories import constants
@@ -18,8 +14,8 @@ from categories.models import Category
 from dateutil.relativedelta import relativedelta
 from django.db.models import Count, Prefetch, Q, Sum
 from django.db.models.functions import TruncMonth
-from transactions.models import Rate, Transaction
 from rates.utils import generate_amount_map
+from transactions.models import Rate, Transaction
 
 RECURRENT_TYPE_MAPPING = {
     BudgetDuplicateType.MONTHLY: {

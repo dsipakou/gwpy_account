@@ -6,14 +6,10 @@ from categories import constants as category_constants
 from django.db.models import Prefetch, QuerySet
 from rates.models import Rate
 from rates.utils import generate_amount_map
-from transactions.entities import (
-    GroupedByCategory,
-    GroupedByParent,
-    TransactionAccountDetails,
-    TransactionCategoryDetails,
-    TransactionItem,
-    TransactionSpentInCurrencyDetails,
-)
+from transactions.entities import (GroupedByCategory, GroupedByParent,
+                                   TransactionAccountDetails,
+                                   TransactionCategoryDetails, TransactionItem,
+                                   TransactionSpentInCurrencyDetails)
 from transactions.models import Transaction, TransactionAmount
 
 
@@ -99,9 +95,9 @@ class TransactionService:
             for currency, value in grouped_by_category[category_name][
                 "spent_in_currencies"
             ].items():
-                grouped_by_category[category_name]["spent_in_currencies"][currency][
-                    "amount"
-                ] += value["amount"]
+                grouped_by_category[category_name]["spent_in_currencies"][
+                    currency
+                ] += value
         return grouped_by_category
 
     @classmethod
@@ -129,9 +125,7 @@ class TransactionService:
             for currency, value in grouped_by_parent[parent_name][
                 "spent_in_currencies"
             ].items():
-                grouped_by_parent[parent_name]["spent_in_currencies"][currency][
-                    "amount"
-                ] += value["amount"]
+                grouped_by_parent[parent_name]["spent_in_currencies"][currency] += value
         return grouped_by_parent
 
     @classmethod

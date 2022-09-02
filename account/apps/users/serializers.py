@@ -20,3 +20,9 @@ class UserSerializer(serializers.ModelSerializer):
 class UserLoginSerializer(serializers.Serializer):
     email = serializers.CharField()
     password = serializers.CharField()
+
+
+class ChangeDefaultCurrencySerializer(serializers.ModelSerializer):
+    class Meta:
+        model = User
+        fields = ("default_currency",)

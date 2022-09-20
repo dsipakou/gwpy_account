@@ -10,3 +10,6 @@ class User(AbstractUser):
     default_currency = models.ForeignKey(
         Currency, on_delete=models.DO_NOTHING, to_field="uuid", null=True
     )
+
+    def currency_code(self):
+        return self.default_currency.code if self.default_currency else None

@@ -3,12 +3,15 @@ from users.models import User
 
 
 class UserSerializer(serializers.ModelSerializer):
+    currency = serializers.CharField(source="currency_code")
+
     class Meta:
         model = User
         fields = (
             "uuid",
             "username",
             "email",
+            "currency",
             "first_name",
             "last_name",
             "is_staff",
@@ -22,7 +25,5 @@ class UserLoginSerializer(serializers.Serializer):
     password = serializers.CharField()
 
 
-class ChangeDefaultCurrencySerializer(serializers.ModelSerializer):
-    class Meta:
-        model = User
-        fields = ("default_currency",)
+class ChangeDefaultCurrencySerializer(serializers.Serializer):
+    currency = serializers.CharField()

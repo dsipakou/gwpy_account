@@ -11,9 +11,11 @@ from budget.exceptions import UnsupportedDuplicateTypeError
 from budget.models import Budget, BudgetAmount
 from categories import constants
 from categories.models import Category
+from currencies.models import Currency
 from dateutil.relativedelta import relativedelta
-from django.db.models import Count, Prefetch, Q, Sum
+from django.db.models import Count, Max, Min, Prefetch, Q, Sum
 from django.db.models.functions import TruncMonth
+from rates.models import Rate
 from rates.utils import generate_amount_map
 from transactions.models import Rate, Transaction
 
@@ -71,6 +73,15 @@ class BudgetService:
 
         return archive
 
+    @staticmethod
+    def _get_latest_rates():
+        latest_rates = {}
+        for currency in Currency.objects.all():
+            rate = Rate.objects.filter(currency=currency).order_by("-rate_date").first()
+            if rate:
+                latest_rates[currency.code] = rate.rate
+        return latest_rates
+
     @classmethod
     def load_budget(
         cls, date_from: datetime.date, date_to: datetime.date, user: Optional[str]
@@ -88,11 +99,15 @@ class BudgetService:
             .order_by("title")
         )
 
+        min_transaction = budgets.aggregate(date=Min("transaction__transaction_date"))
+        max_transaction = budgets.aggregate(date=Max("transaction__transaction_date"))
+
         if user:
             budgets = budgets.filter(user__uuid=user)
 
         rates = Rate.objects.filter(
-            rate_date__lte=date_to, rate_date__gte=date_from
+            rate_date__lte=max_transaction["date"],
+            rate_date__gte=min_transaction["date"],
         ).prefetch_related("currency")
         rates_dict = {(rate.currency.uuid, rate.rate_date): rate.rate for rate in rates}
 
@@ -114,7 +129,7 @@ class BudgetService:
             .order_by("name")
         )
 
-        return cls.make_categories(categories, rates_dict)
+        return cls.make_categories(categories, rates_dict, cls._get_latest_rates())
 
     @classmethod
     def load_weekly_budget(
@@ -125,29 +140,47 @@ class BudgetService:
         ).prefetch_related(
             Prefetch(
                 "transaction_set",
-                queryset=Transaction.objects.all(),
+                queryset=Transaction.objects.all().prefetch_related(
+                    "calculated_amount"
+                ),
                 to_attr="budget_transactions",
             ),
         )
         if user:
             budgets = budgets.filter(user__uuid=user)
 
-        rates = Rate.objects.filter(rate_date__lte=date_to, rate_date__gte=date_from)
+        min_transaction = budgets.aggregate(date=Min("transaction__transaction_date"))
+        max_transaction = budgets.aggregate(date=Max("transaction__transaction_date"))
+
+        rates = Rate.objects.filter(
+            rate_date__lte=max_transaction["date"],
+            rate_date__gte=min_transaction["date"],
+        )
         rates_dict = {(rate.currency.uuid, rate.rate_date): rate.rate for rate in rates}
 
-        return cls.make_budgets(budgets, rates_dict)
+        return cls.make_budgets(budgets, rates_dict, cls._get_latest_rates())
 
     @classmethod
-    def make_categories(cls, categories, rates) -> List[CategoryItem]:
+    def make_categories(cls, categories, rates, latest_rates) -> List[CategoryItem]:
         categories_list = []
         for category in categories:
-            budgets = cls.make_grouped_budgets(category.category_budgets, rates)
+            budgets = cls.make_grouped_budgets(
+                category.category_budgets, rates, latest_rates
+            )
             spent_in_base_currency = sum(
                 item["spent_in_base_currency"] for item in budgets
             )
             spent_in_original_currency = sum(
                 item["spent_in_original_currency"] for item in budgets
             )
+            spent_in_currencies = {}
+
+            for currency in Currency.objects.all():
+                spent_in_currencies[currency.code] = sum(
+                    budget["spent_in_currencies"].get(currency.code, 0)
+                    for budget in budgets
+                )
+
             planned = sum(item["planned"] for item in budgets)
             categories_list.append(
                 CategoryItem(
@@ -157,15 +190,18 @@ class BudgetService:
                     planned=planned,
                     spent_in_base_currency=spent_in_base_currency,
                     spent_in_original_currency=spent_in_original_currency,
+                    spent_in_currencies=spent_in_currencies,
                 )
             )
         return categories_list
 
     @classmethod
-    def make_grouped_budgets(cls, budgets, rates) -> List[BudgetGroupedItem]:
+    def make_grouped_budgets(
+        cls, budgets, rates, latest_rates
+    ) -> List[BudgetGroupedItem]:
         budgets_list = []
         grouped_dict = {}
-        for budget in cls.make_budgets(budgets, rates):
+        for budget in cls.make_budgets(budgets, rates, latest_rates):
             if budget["title"] not in grouped_dict:
                 grouped_dict[budget["title"]] = {
                     "uuid": budget["uuid"],
@@ -174,6 +210,7 @@ class BudgetService:
                     "planned": budget["planned"],
                     "spent_in_base_currency": budget["spent_in_base_currency"],
                     "spent_in_original_currency": budget["spent_in_original_currency"],
+                    "spent_in_currencies": budget["spent_in_currencies"],
                     "items": [budget],
                 }
             else:
@@ -184,6 +221,16 @@ class BudgetService:
                 grouped_dict[budget["title"]]["spent_in_original_currency"] += budget[
                     "spent_in_original_currency"
                 ]
+                for currency in Currency.objects.values_list("code", flat=True):
+                    grouped_dict[budget["title"]]["spent_in_currencies"][
+                        currency
+                    ] = grouped_dict[budget["title"]]["spent_in_currencies"].get(
+                        currency, 0
+                    ) + budget[
+                        "spent_in_currencies"
+                    ].get(
+                        currency, 0
+                    )
                 grouped_dict[budget["title"]]["items"].append(budget)
 
         for value in grouped_dict.values():
@@ -191,12 +238,15 @@ class BudgetService:
         return budgets_list
 
     @classmethod
-    def make_budgets(cls, budgets, rates) -> List[BudgetItem]:
+    def make_budgets(cls, budgets, rates, latest_rates) -> List[BudgetItem]:
         budgets_list = []
         for budget in budgets:
-            transactions = cls.make_transactions(budget.budget_transactions, rates)
+            transactions = cls.make_transactions(
+                budget.budget_transactions, rates, latest_rates
+            )
             spent_in_base_currency = 0
             spent_in_original_currency = 0
+            spent_in_currencies = {}
             if len(transactions) > 0:
                 spent_in_base_currency = sum(
                     item["spent_in_base_currency"] for item in transactions
@@ -204,6 +254,11 @@ class BudgetService:
                 spent_in_original_currency = sum(
                     item["spent_in_original_currency"] for item in transactions
                 )
+                for currency in Currency.objects.all():
+                    spent_in_currencies[currency.code] = sum(
+                        transaction["spent_in_currencies"].get(currency.code, 0)
+                        for transaction in transactions
+                    )
             budgets_list.append(
                 BudgetItem(
                     uuid=budget.uuid,
@@ -219,6 +274,7 @@ class BudgetService:
                     planned=budget.amount,
                     spent_in_base_currency=spent_in_base_currency,
                     spent_in_original_currency=spent_in_original_currency,
+                    spent_in_currencies=spent_in_currencies,
                     created_at=budget.created_at,
                     modified_at=budget.modified_at,
                 )
@@ -226,7 +282,7 @@ class BudgetService:
         return budgets_list
 
     @classmethod
-    def make_transactions(cls, transactions, rates) -> List[dict]:
+    def make_transactions(cls, transactions, rates, latest_rates) -> List[dict]:
         transactions_list = []
         for transaction in transactions:
             if transaction.currency.is_base:
@@ -238,6 +294,12 @@ class BudgetService:
                     )
                     * transaction.amount
                 )
+            calculated_amount = transaction.calculated_amount.amount_map
+            for latest_rate in latest_rates:
+                if latest_rate not in calculated_amount:
+                    calculated_amount[latest_rate] = round(
+                        spent_in_base_currency / latest_rates[latest_rate], 5
+                    )
             transactions_list.append(
                 BudgetTransactionItem(
                     uuid=transaction.uuid,
@@ -245,6 +307,7 @@ class BudgetService:
                     currency_code=transaction.currency.code,
                     spent_in_base_currency=spent_in_base_currency,
                     spent_in_original_currency=transaction.amount,
+                    spent_in_currencies=calculated_amount,
                 )
             )
         return transactions_list
@@ -261,6 +324,9 @@ class BudgetService:
             budget_date__gte=RECURRENT_TYPE_MAPPING[recurrent_type]["start_date"],
             budget_date__lte=RECURRENT_TYPE_MAPPING[recurrent_type]["end_date"],
         ).order_by("budget_date")
+        print(RECURRENT_TYPE_MAPPING[recurrent_type]["start_date"])
+        print(RECURRENT_TYPE_MAPPING[recurrent_type]["end_date"])
+        print(items.count())
 
         output = []
         for item in items:

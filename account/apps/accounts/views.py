@@ -1,6 +1,7 @@
 from accounts.models import Account
 from accounts.serializers import AccountSerializer
-from rest_framework.generics import ListCreateAPIView, RetrieveUpdateDestroyAPIView
+from rest_framework.generics import (ListCreateAPIView,
+                                     RetrieveUpdateDestroyAPIView)
 
 
 class AccountList(ListCreateAPIView):

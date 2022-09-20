@@ -7,12 +7,9 @@ from budget.services import BudgetService
 from rest_framework import status
 from rest_framework.authentication import TokenAuthentication
 from rest_framework.exceptions import ValidationError
-from rest_framework.generics import (
-    GenericAPIView,
-    ListAPIView,
-    ListCreateAPIView,
-    RetrieveUpdateDestroyAPIView,
-)
+from rest_framework.generics import (GenericAPIView, ListAPIView,
+                                     ListCreateAPIView,
+                                     RetrieveUpdateDestroyAPIView)
 from rest_framework.response import Response
 
 

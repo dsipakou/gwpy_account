@@ -59,6 +59,7 @@ class TransactionSerializer(serializers.Serializer):
     currency_code = serializers.CharField()
     spent_in_original_currency = serializers.FloatField()
     spent_in_base_currency = serializers.FloatField()
+    spent_in_currencies = serializers.DictField()
 
 
 class BudgetUsageSerializer(serializers.Serializer):
@@ -75,6 +76,7 @@ class BudgetUsageSerializer(serializers.Serializer):
     transactions = serializers.ListField(child=TransactionSerializer())
     spent_in_original_currency = serializers.FloatField()
     spent_in_base_currency = serializers.FloatField()
+    spent_in_currencies = serializers.DictField()
     created_at = serializers.DateTimeField()
     modified_at = serializers.DateTimeField()
 
@@ -105,6 +107,7 @@ class BudgetGroupedUsageSerializer(serializers.Serializer):
     planned = serializers.IntegerField()
     spent_in_original_currency = serializers.FloatField()
     spent_in_base_currency = serializers.FloatField()
+    spent_in_currencies = serializers.DictField()
     items = serializers.ListField(child=BudgetUsageSerializer())
 
 
@@ -115,6 +118,7 @@ class CategoryBudgetSerializer(serializers.Serializer):
     planned = serializers.FloatField()
     spent_in_original_currency = serializers.FloatField()
     spent_in_base_currency = serializers.FloatField()
+    spent_in_currencies = serializers.DictField()
 
 
 class DuplicateRequestSerializer(serializers.Serializer):
@@ -122,7 +126,7 @@ class DuplicateRequestSerializer(serializers.Serializer):
 
     def validate_type(self, value):
         if value not in constants.ALLOWED_BUDGET_RECURRENT_TYPE:
-            return ValidationError("Unsupported budget reccurent type")
+            return ValidatiorError("Unsupported budget reccurent type")
         return value
 
 

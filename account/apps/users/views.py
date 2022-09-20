@@ -1,3 +1,4 @@
+from currencies.models import Currency
 from rest_framework import status
 from rest_framework.authentication import TokenAuthentication
 from rest_framework.authtoken.models import Token
@@ -28,6 +29,9 @@ class UserAuth(ObtainAuthToken):
                 "token": token.key,
                 "username": user.username,
                 "email": user.email,
+                "currency": user.default_currency.code
+                if user.default_currency
+                else None,
             }
         )
 
@@ -41,6 +45,7 @@ class CurrencyView(UpdateAPIView):
         serializer = self.get_serializer(data=request.data)
         serializer.is_valid(raise_exception=True)
         user = request.user
-        user.default_currency = serializer.validated_data["default_currency"]
+        currency_code = serializer.validated_data["currency"]
+        user.default_currency = Currency.objects.get(code=currency_code)
         user.save(force_update=True, update_fields=("default_currency",))
         return Response(status=status.HTTP_200_OK)

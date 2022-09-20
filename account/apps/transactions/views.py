@@ -2,21 +2,16 @@ from datetime import date, datetime, timedelta
 
 from categories import constants
 from rest_framework import status
-from rest_framework.generics import (
-    ListAPIView,
-    ListCreateAPIView,
-    RetrieveUpdateDestroyAPIView,
-)
+from rest_framework.generics import (ListAPIView, ListCreateAPIView,
+                                     RetrieveUpdateDestroyAPIView)
 from rest_framework.response import Response
 from transactions.models import Transaction
-from transactions.serializers import (
-    GroupedTransactionSerializer,
-    IncomeSerializer,
-    ReportByMonthSerializer,
-    TransactionCreateSerializer,
-    TransactionDetailsSerializer,
-    TransactionSerializer,
-)
+from transactions.serializers import (GroupedTransactionSerializer,
+                                      IncomeSerializer,
+                                      ReportByMonthSerializer,
+                                      TransactionCreateSerializer,
+                                      TransactionDetailsSerializer,
+                                      TransactionSerializer)
 from transactions.services import ReportService, TransactionService
 
 
@@ -82,6 +77,13 @@ class TransactionIncomeList(ListAPIView):
     serializer_class = IncomeSerializer
 
     def list(self, request, *args, **kwargs):
-        data = Transaction.objects.filter(category__type=constants.INCOME)
-        serializer = self.get_serializer(instance=data, many=True)
+        date_to = datetime.strptime(request.GET["dateTo"], "%Y-%m")
+        date_from = datetime.strptime(request.GET["dateFrom"], "%Y-%m")
+        transactions = Transaction.objects.filter(
+            category__type=constants.INCOME,
+            transaction_date__gte=date_from,
+            transaction_date__lte=date_to,
+        ).prefetch_related("calculated_amount")
+        data = TransactionService.group_by_month(transactions)
+        serializer = self.get_serializer(instance=transactions, many=True)
         return Response(serializer.data)

@@ -1,5 +1,5 @@
 import datetime
-from typing import List, TypedDict
+from typing import Dict, List, TypedDict
 from uuid import UUID
 
 
@@ -9,12 +9,14 @@ class BudgetTransactionItem(TypedDict):
     currency_code: str
     spent_in_base_currency: float
     spent_in_original_currency: float
+    spent_in_currencies: Dict[str, float]
 
 
 class BudgetItem(TypedDict):
     uuid: UUID
     user: UUID
     category: UUID
+    currency: UUID
     title: str
     budget_date: datetime.date
     transactions: List[BudgetTransactionItem]
@@ -25,6 +27,7 @@ class BudgetItem(TypedDict):
     planned: float
     spent_in_base_currency: float
     spent_in_original_currency: float
+    spent_in_currencies: Dict[str, float]
     created_at: datetime.datetime
     modified_at: datetime.datetime
 
@@ -36,6 +39,7 @@ class BudgetGroupedItem(TypedDict):
     planned: float
     spent_in_base_currency: float
     spent_in_original_currency: float
+    spent_in_currencies: Dict[str, float]
     items: List[BudgetItem]
 
 
@@ -47,6 +51,7 @@ class CategoryItem(TypedDict):
     planned: float
     spent_in_original_currency: float
     spent_in_base_currency: float
+    spent_in_currencies: Dict[str, float]
 
 
 class MonthUsageSum(TypedDict):

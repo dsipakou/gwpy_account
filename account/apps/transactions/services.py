@@ -3,11 +3,11 @@ from typing import Dict, List, Optional
 from uuid import UUID
 
 from categories import constants as category_constants
-from django.db.models import Prefetch, QuerySet
+from django.db.models import QuerySet
 from rates.models import Rate
 from rates.utils import generate_amount_map
-from transactions.entities import (GroupedByCategory, GroupedByParent,
-                                   TransactionAccountDetails,
+from transactions.entities import (GroupedByCategory, GroupedByMonth,
+                                   GroupedByParent, TransactionAccountDetails,
                                    TransactionCategoryDetails, TransactionItem,
                                    TransactionSpentInCurrencyDetails)
 from transactions.models import Transaction, TransactionAmount
@@ -64,6 +64,34 @@ class TransactionService:
             created_at=transaction.created_at,
             modified_at=transaction.modified_at,
         )
+
+    @classmethod
+    def group_by_month(cls, transactions: List[Transaction]) -> List[GroupedByMonth]:
+        grouped_by_month = {}
+        for transaction in transactions:
+            print(transaction)
+            transaction_details: TransactionItem = cls.get_transaction(transaction)
+            date = transaction_details["transaction_date"]
+            formatted_date = f"{date.year}-{date.month}"
+            grouped_by_month[formatted_date] = grouped_by_month.get(formatted_date)
+            if not grouped_by_month[formatted_date]:
+                grouped_by_month[formatted_date] = {
+                    "month": date.month,
+                    "year": date.year,
+                    "spent_in_base_currency": transaction_details[
+                        "spent_in_base_currency"
+                    ],
+                    "spent_in_currencies": transaction_details["spent_in_currencies"],
+                }
+            else:
+                grouped_by_month[formatted_date][
+                    "spent_in_base_currency"
+                ] += transaction_details["spent_in_base_currency"]
+                for currency in grouped_by_month[formatted_date]["spent_in_currencies"]:
+                    grouped_by_month[formatted_date]["spent_in_currencies"][
+                        currency
+                    ] += transaction_details["spent_in_currencies"][currency]
+        print(grouped_by_month)
 
     @classmethod
     def group_by_category(cls, transactions: QuerySet) -> GroupedByCategory:

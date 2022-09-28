@@ -153,8 +153,8 @@ class BudgetService:
         max_transaction = budgets.aggregate(date=Max("transaction__transaction_date"))
 
         rates = Rate.objects.filter(
-            rate_date__lte=max_transaction["date"],
-            rate_date__gte=min_transaction["date"],
+            rate_date__lte=max_transaction["date"] or date_to,
+            rate_date__gte=min_transaction["date"] or date_from,
         )
         rates_dict = {(rate.currency.uuid, rate.rate_date): rate.rate for rate in rates}
 

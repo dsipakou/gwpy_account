@@ -11,9 +11,10 @@ def set_budget_user(apps, schema_editor):
 
     admin_user_uuid = os.environ.get("ADMIN_USER_UUID", "")
     user_items = apps.get_model("users", "User")
-    admin_user = user_items.objects.get(uuid=admin_user_uuid)
+    if len(user_items.objects.all()) > 0:
+        admin_user = user_items.objects.get(uuid=admin_user_uuid)
 
-    qs.update(user=admin_user)
+        qs.update(user=admin_user)
 
 
 class Migration(migrations.Migration):

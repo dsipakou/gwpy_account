@@ -8,9 +8,10 @@ def set_budget_currency(apps, schema_editor):
     qs = budget_items.objects.filter(currency=None)
 
     currency_items = apps.get_model("currencies", "Currency")
-    base_currency = currency_items.objects.get(is_base=True)
+    if qs.exists():
+        base_currency = currency_items.objects.get(is_base=True)
 
-    qs.update(currency=base_currency)
+        qs.update(currency=base_currency)
 
 
 class Migration(migrations.Migration):

@@ -2,6 +2,7 @@ import datetime
 from typing import Dict, List, Union
 
 from budget.models import Budget
+from currencies.models import Currency
 from rates.models import Rate
 from transactions.models import Transaction
 
@@ -16,7 +17,19 @@ def generate_amount_map(
     instance: Union[Transaction, Budget], rates: List[Rate]
 ) -> Dict[str, int]:
     amount_mapping = {}
+    rate_map = {}
     for rate in rates:
+        rate_map[rate.currency_id] = rate
+    for currency in Currency.objects.all():
+        if currency.uuid not in rate_map:
+            rate = (
+                Rate.objects.filter(currency_id=currency.uuid)
+                .order_by("-rate_date")
+                .first()
+            )
+            if rate is not None:
+                rate_map[currency.uuid] = rate
+    for rate in rate_map.values():
         if instance.currency == rate.currency:
             # current rate currency and instance currency are the same no need to modify amount
             amount = instance.amount
@@ -25,14 +38,18 @@ def generate_amount_map(
             amount = round(instance.amount / rate.rate, 5)
         else:
             # need to convert amount to base currency first than to current rate currency
-            current_rate = rates.get(currency=instance.currency)
+
+            current_rate = rate_map[instance.currency.uuid]
             amount = round(instance.amount * current_rate.rate / rate.rate, 5)
         amount_mapping[rate.currency.code] = amount
     # Create a record for base currency as well
-    if rates:
-        if instance.currency == rates[0].base_currency:
+    if rate_map:
+        # if instance currency is already base currency - save it as is
+        base_currency = [_ for _ in rate_map.values()][0].base_currency
+        if instance.currency.uuid == base_currency.uuid:
             amount_mapping[instance.currency.code] = instance.amount
         else:
-            amount = instance.amount * rates.get(currency=instance.currency).rate
-            amount_mapping[rates[0].base_currency.code] = round(amount, 5)
+            # else searching instance currency in rate_map and do convert
+            amount = instance.amount * rate_map[instance.currency.uuid].rate
+            amount_mapping[base_currency.code] = round(amount, 5)
     return amount_mapping

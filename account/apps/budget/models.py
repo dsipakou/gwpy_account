@@ -32,5 +32,5 @@ class Budget(models.Model):
 
 class BudgetAmount(models.Model):
     uuid = models.UUIDField(unique=True, default=uuid.uuid4, editable=False)
-    budget = models.OneToOneField(Budget, to_field="uuid", on_delete=models.CASCADE)
+    budget = models.OneToOneField(Budget, to_field="uuid", related_name="multicurrency", on_delete=models.CASCADE)
     amount_map = models.JSONField(default=dict)

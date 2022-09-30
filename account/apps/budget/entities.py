@@ -25,6 +25,7 @@ class BudgetItem(TypedDict):
     is_completed: bool
     recurrent: str
     planned: float
+    planned_in_currencies: Dict[str, float]
     spent_in_base_currency: float
     spent_in_original_currency: float
     spent_in_currencies: Dict[str, float]
@@ -37,6 +38,7 @@ class BudgetGroupedItem(TypedDict):
     user: UUID
     title: str
     planned: float
+    planned_in_currencies: Dict[str, float]
     spent_in_base_currency: float
     spent_in_original_currency: float
     spent_in_currencies: Dict[str, float]
@@ -49,6 +51,7 @@ class CategoryItem(TypedDict):
     category_name: str
     budgets: List[BudgetGroupedItem]
     planned: float
+    planned_in_currencies: Dict[str, float]
     spent_in_original_currency: float
     spent_in_base_currency: float
     spent_in_currencies: Dict[str, float]

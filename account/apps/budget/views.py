@@ -51,7 +51,8 @@ class BudgetDetails(RetrieveUpdateDestroyAPIView):
 
         if serializer.validated_data["category"].parent is not None:
             raise ValidationError("Only parent categories can be used for budgets.")
-        super().perform_update(serializer)
+        instance = serializer.save()
+        BudgetService.create_budget_multicurrency_amount([instance.uuid])
 
 
 class PlannedBudgetList(ListAPIView):

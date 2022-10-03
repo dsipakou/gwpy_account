@@ -1,16 +1,13 @@
-import datetime
-
 from currencies.models import Currency
-from html5lib import serialize
 from rates.filters import DateFilter
 from rates.models import Rate
-from rates.serializers import (CreateBatchedRateSerializer,
+from rates.serializers import (AvailableRates, CreateBatchedRateSerializer,
                                RateChartDataSerializer, RateChartSerializer,
                                RateSerializer)
 from rates.services import RateService
 from rates.utils import generate_date_seq
-from rest_framework.generics import (CreateAPIView, ListAPIView,
-                                     ListCreateAPIView,
+from rest_framework.generics import (CreateAPIView, GenericAPIView,
+                                     ListAPIView, ListCreateAPIView,
                                      RetrieveUpdateDestroyAPIView)
 from rest_framework.response import Response
 
@@ -98,3 +95,29 @@ class RateChartData(ListAPIView):
             )
         serializer = self.get_serializer(rates, many=True)
         return Response(serializer.data)
+
+
+class AvailableRates(GenericAPIView):
+    def get(self, request, rate_date, *args, **kwargs):
+        currencies = Currency.objects.all()
+        rates = Rate.objects.filter(rate_date=rate_date).values_list(
+            "currency_id", flat=True
+        )
+        first_rate = Rate.objects.filter(rate_date=rate_date).first()
+        available_rates = {}
+        for currency in currencies:
+            # if rate exists for current item
+            # or
+            # if currency is base for the first rate
+            # or
+            # if no rates but currency is base now
+            if (
+                currency.uuid in rates
+                or (first_rate and currency == first_rate.base_currency)
+                or (not first_rate and currency.is_base)
+            ):
+                available_rates[currency.code] = True
+            else:
+                available_rates[currency.code] = False
+        serializer_data = AvailableRates(data=available_rates)
+        return Response(serializer_data.data)

@@ -36,3 +36,7 @@ class RateChartDataSerializer(serializers.Serializer):
 class RateChartSerializer(serializers.Serializer):
     currency_uuid = serializers.UUIDField()
     data = serializers.ListField(child=RateChartDataSerializer())
+
+
+class AvailableRates(serializers.Serializer):
+    rates = serializers.DictField()

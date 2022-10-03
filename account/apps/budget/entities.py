@@ -10,6 +10,7 @@ class BudgetTransactionItem(TypedDict):
     spent_in_base_currency: float
     spent_in_original_currency: float
     spent_in_currencies: Dict[str, float]
+    transaction_date: str
 
 
 class BudgetItem(TypedDict):

@@ -107,8 +107,8 @@ class BudgetService:
             budgets = budgets.filter(user__uuid=user)
 
         rates = Rate.objects.filter(
-            rate_date__lte=max_transaction["date"],
-            rate_date__gte=min_transaction["date"],
+            rate_date__lte=max_transaction["date"] or date_to,
+            rate_date__gte=min_transaction["date"] or date_from,
         ).prefetch_related("currency")
         rates_dict = {(rate.currency.uuid, rate.rate_date): rate.rate for rate in rates}
 
@@ -260,27 +260,34 @@ class BudgetService:
         budgets_list = []
         for budget in budgets:
             if budget.currency.is_base:
-                spent_in_base_currency = budget.amount
+                planned_in_base_currency = budget.amount
             else:
-                spent_in_base_currency = (
-                    rates.get((budget.currency.uuid, budget.transaction_date), 0)
+                planned_in_base_currency = (
+                    rates.get((budget.currency.uuid, budget.budget_date), 0)
                     * budget.amount
                 )
             transactions = cls.make_transactions(
                 budget.budget_transactions, rates, latest_rates
             )
             spent_in_original_currency = 0
+            spent_in_base_currency = 0
             spent_in_currencies = {}
             planned_in_currencies = {}
             for currency in Currency.objects.all():
-                if currency.code in budget.multicurrency.amount_map:
+                if (
+                    budget.multicurrency
+                    and currency.code in budget.multicurrency.amount_map
+                ):
                     planned_in_currencies[
                         currency.code
                     ] = budget.multicurrency.amount_map[currency.code]
+                elif currency.is_base:
+                    planned_in_currencies[currency.code] = planned_in_base_currency
                 else:
                     try:
                         planned_in_currencies[currency.code] = round(
-                            spent_in_base_currency / latest_rates.get(currency.code, 0),
+                            planned_in_base_currency
+                            / latest_rates.get(currency.code, 0),
                             5,
                         )
                     except ZeroDivisionError:
@@ -297,27 +304,26 @@ class BudgetService:
                         transaction["spent_in_currencies"].get(currency.code, 0)
                         for transaction in transactions
                     )
-            budgets_list.append(
-                BudgetItem(
-                    uuid=budget.uuid,
-                    category=budget.category.uuid,
-                    currency=budget.currency.uuid,
-                    user=budget.user.uuid,
-                    title=budget.title,
-                    budget_date=budget.budget_date,
-                    transactions=transactions,
-                    description=budget.description,
-                    recurrent=budget.recurrent,
-                    is_completed=budget.is_completed,
-                    planned=budget.amount,
-                    planned_in_currencies=planned_in_currencies,
-                    spent_in_base_currency=spent_in_base_currency,
-                    spent_in_original_currency=spent_in_original_currency,
-                    spent_in_currencies=spent_in_currencies,
-                    created_at=budget.created_at,
-                    modified_at=budget.modified_at,
-                )
+            budget_item = BudgetItem(
+                uuid=budget.uuid,
+                category=budget.category.uuid,
+                currency=budget.currency.uuid,
+                user=budget.user.uuid,
+                title=budget.title,
+                budget_date=budget.budget_date,
+                transactions=transactions,
+                description=budget.description,
+                recurrent=budget.recurrent,
+                is_completed=budget.is_completed,
+                planned=budget.amount,
+                planned_in_currencies=planned_in_currencies,
+                spent_in_base_currency=spent_in_base_currency,
+                spent_in_original_currency=spent_in_original_currency,
+                spent_in_currencies=spent_in_currencies,
+                created_at=budget.created_at,
+                modified_at=budget.modified_at,
             )
+            budgets_list.append(budget_item)
         return budgets_list
 
     @classmethod
@@ -350,8 +356,10 @@ class BudgetService:
                     spent_in_base_currency=spent_in_base_currency,
                     spent_in_original_currency=transaction.amount,
                     spent_in_currencies=calculated_amount,
+                    transaction_date=transaction.transaction_date,
                 )
             )
+        transactions_list.sort(key=lambda x: x["transaction_date"])
         return transactions_list
 
     @classmethod

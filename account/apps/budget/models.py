@@ -19,7 +19,7 @@ class Budget(models.Model):
         "currencies.Currency", on_delete=models.DO_NOTHING, to_field="uuid"
     )
     title = models.CharField(max_length=60)
-    amount = models.IntegerField()
+    amount = models.FloatField()
     budget_date = models.DateField()
     description = models.CharField(max_length=255, blank=True)
     is_completed = models.BooleanField(default=False)
@@ -32,5 +32,7 @@ class Budget(models.Model):
 
 class BudgetAmount(models.Model):
     uuid = models.UUIDField(unique=True, default=uuid.uuid4, editable=False)
-    budget = models.OneToOneField(Budget, to_field="uuid", related_name="multicurrency", on_delete=models.CASCADE)
+    budget = models.OneToOneField(
+        Budget, to_field="uuid", related_name="multicurrency", on_delete=models.CASCADE
+    )
     amount_map = models.JSONField(default=dict)

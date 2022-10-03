@@ -60,6 +60,7 @@ class TransactionSerializer(serializers.Serializer):
     spent_in_original_currency = serializers.FloatField()
     spent_in_base_currency = serializers.FloatField()
     spent_in_currencies = serializers.DictField()
+    transaction_date = serializers.CharField()
 
 
 class BudgetUsageSerializer(serializers.Serializer):

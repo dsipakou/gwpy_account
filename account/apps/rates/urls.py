@@ -10,7 +10,7 @@ urlpatterns = [
     path("batched/", views.CreateBatchedRate.as_view(), name="create_batched_rate"),
     path("day/<ymddate:rate_date>/", views.RateDayData.as_view(), name="rate_day_data"),
     path(
-        "available/<ymddate:rate_date>",
+        "available",
         views.AvailableRates.as_view(),
         name="available_rates",
     ),

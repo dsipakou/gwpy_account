@@ -10,10 +10,15 @@ from rest_framework.generics import (CreateAPIView, GenericAPIView,
                                      ListAPIView, ListCreateAPIView,
                                      RetrieveUpdateDestroyAPIView)
 from rest_framework.response import Response
+from rest_framework.status import HTTP_400_BAD_REQUEST
+
 
 
 class RateList(ListCreateAPIView):
-    queryset = Rate.objects.order_by("rate_date").reverse()[:180]
+    queryset = (
+        Rate.objects.select_related("currency", "base_currency").order_by("rate_date").reverse()[:180]
+    )
+    pagination_class = None
     serializer_class = RateSerializer
 
 
@@ -98,12 +103,19 @@ class RateChartData(ListAPIView):
 
 
 class AvailableRates(GenericAPIView):
-    def get(self, request, rate_date, *args, **kwargs):
+    def get(self, request, *args, **kwargs):
+        date = request.GET.get("date")
+        if not date:
+            return Response(
+                status=HTTP_400_BAD_REQUEST,
+                exception=True,
+                data={"details": "date_not_found"},
+            )
         currencies = Currency.objects.all()
-        rates = Rate.objects.filter(rate_date=rate_date).values_list(
+        rates = Rate.objects.filter(rate_date=date).values_list(
             "currency_id", flat=True
         )
-        first_rate = Rate.objects.filter(rate_date=rate_date).first()
+        first_rate = Rate.objects.filter(rate_date=date).first()
         available_rates = {}
         for currency in currencies:
             # if rate exists for current item

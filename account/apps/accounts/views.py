@@ -1,5 +1,6 @@
 from accounts.models import Account
 from accounts.serializers import AccountSerializer
+from django.db.models import Exists
 from rest_framework.generics import (ListCreateAPIView,
                                      RetrieveUpdateDestroyAPIView)
 

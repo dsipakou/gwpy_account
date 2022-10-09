@@ -42,10 +42,6 @@ class Transaction(models.Model):
             "currency"
         )
 
-    @property
-    def all_amounts(self):
-        return TransactionAmount.objects.get(transaction=self)
-
     @classmethod
     def grouped_by_month(cls, date_from, date_to, currency_code):
         raw_sql = textwrap.dedent(
@@ -118,11 +114,11 @@ class Transaction(models.Model):
         return grouped_transactions
 
 
-class TransactionAmount(models.Model):
+class TransactionMulticurrency(models.Model):
     uuid = models.UUIDField(unique=True, default=uuid.uuid4, editable=False)
     transaction = models.OneToOneField(
         Transaction,
-        related_name="calculated_amount",
+        related_name="multicurrency",
         to_field="uuid",
         on_delete=models.CASCADE,
     )

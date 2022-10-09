@@ -83,7 +83,7 @@ class TransactionIncomeList(ListAPIView):
             category__type=constants.INCOME,
             transaction_date__gte=date_from,
             transaction_date__lte=date_to,
-        ).prefetch_related("calculated_amount")
+        ).select_related("multicurrency")
         data = TransactionService.group_by_month(transactions)
         serializer = self.get_serializer(instance=transactions, many=True)
         return Response(serializer.data)

@@ -30,7 +30,7 @@ class Budget(models.Model):
     modified_at = models.DateTimeField(auto_now=True)
 
 
-class BudgetAmount(models.Model):
+class BudgetMulticurrency(models.Model):
     uuid = models.UUIDField(unique=True, default=uuid.uuid4, editable=False)
     budget = models.OneToOneField(
         Budget, to_field="uuid", related_name="multicurrency", on_delete=models.CASCADE

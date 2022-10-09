@@ -2,11 +2,12 @@
 
 from django.db import migrations
 from rates.models import Rate
-from transactions.models import Transaction, TransactionAmount
+from transactions.models import Transaction
 
 
 def generate_transaction_pricing(apps, schema_editor):
     qs = Transaction.objects.all()
+    TransactionAmount = apps.get_model("transactions", "TransactionAmount")
     counter = 1
     for transaction in qs:
         rates_on_date = Rate.objects.filter(

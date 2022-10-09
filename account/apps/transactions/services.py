@@ -10,7 +10,7 @@ from transactions.entities import (GroupedByCategory, GroupedByMonth,
                                    GroupedByParent, TransactionAccountDetails,
                                    TransactionCategoryDetails, TransactionItem,
                                    TransactionSpentInCurrencyDetails)
-from transactions.models import Transaction, TransactionAmount
+from transactions.models import Transaction, TransactionMulticurrency
 
 
 class TransactionService:
@@ -25,7 +25,7 @@ class TransactionService:
         for transaction in transactions:
             amount_mapping = generate_amount_map(transaction, rates_on_date)
 
-            TransactionAmount.objects.update_or_create(
+            TransactionMulticurrency.objects.update_or_create(
                 transaction=transaction, defaults={"amount_map": amount_mapping}
             )
 
@@ -44,7 +44,7 @@ class TransactionService:
             title=transaction.account.title,
         )
         spent_details = TransactionSpentInCurrencyDetails(
-            transaction.calculated_amount.amount_map
+            transaction.multicurrency.amount_map
         )
 
         return TransactionItem(
@@ -174,8 +174,7 @@ class TransactionService:
         qs = (
             Transaction.objects.all()
             .order_by(f"-{order_by}")
-            .prefetch_related("calculated_amount")
-            .select_related("category", "account")[:limit]
+            .select_related("multicurrency", "category", "account")[:limit]
         )
 
         for transaction in qs:

@@ -1,4 +1,6 @@
 from currencies.models import Currency
+from django.db.models import Window, F
+from django.db.models.functions import RowNumber
 from rates.filters import DateFilter
 from rates.models import Rate
 from rates.serializers import (AvailableRates, CreateBatchedRateSerializer,
@@ -13,13 +15,24 @@ from rest_framework.response import Response
 from rest_framework.status import HTTP_400_BAD_REQUEST
 
 
-
 class RateList(ListCreateAPIView):
-    queryset = (
-        Rate.objects.select_related("currency", "base_currency").order_by("rate_date").reverse()[:180]
-    )
     pagination_class = None
     serializer_class = RateSerializer
+
+    def get_queryset(self):
+        limit = int(self.request.GET.get("limit", 60))
+        grouped_queryset = Rate.objects.annotate(
+            seq_number=Window(
+                expression=RowNumber(),
+                partition_by=F("currency"),
+                order_by=F("rate_date").desc(),
+            )
+        )
+        sql, params = grouped_queryset.query.sql_with_params()
+        self.queryset = Rate.objects.raw("""
+            SELECT * FROM ({}) as seq_table WHERE seq_table.seq_number <= %s
+        """.format(sql), [*params, limit])
+        return super().get_queryset()
 
 
 class CreateBatchedRate(CreateAPIView):
@@ -112,24 +125,23 @@ class AvailableRates(GenericAPIView):
                 data={"details": "date_not_found"},
             )
         currencies = Currency.objects.all()
-        rates = Rate.objects.filter(rate_date=date).values_list(
-            "currency_id", flat=True
-        )
+        rates_qs = Rate.objects.filter(rate_date=date).values("currency_id", "rate")
+        rates = {rate["currency_id"]: rate["rate"] for rate in rates_qs}
         first_rate = Rate.objects.filter(rate_date=date).first()
         available_rates = {}
         for currency in currencies:
             # if rate exists for current item
             # or
-            # if currency is base for the first rate
+            # if currency is base for the first rate on date
             # or
             # if no rates but currency is base now
-            if (
-                currency.uuid in rates
-                or (first_rate and currency == first_rate.base_currency)
-                or (not first_rate and currency.is_base)
+            if currency.uuid in rates:
+                available_rates[currency.code] = rates[currency.uuid]
+            elif (first_rate and currency == first_rate.base_currency) or (
+                not first_rate and currency.is_base
             ):
-                available_rates[currency.code] = True
+                available_rates[currency.code] = 1
             else:
-                available_rates[currency.code] = False
+                available_rates[currency.code] = None
         serializer_data = AvailableRates(data=available_rates)
         return Response(serializer_data.data)

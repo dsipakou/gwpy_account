@@ -3,6 +3,8 @@ from rest_framework import serializers
 
 
 class CategorySerializer(serializers.ModelSerializer):
+    test = serializers.BooleanField(required=False)
+
     class Meta:
         model = Category
         fields = (
@@ -12,6 +14,7 @@ class CategorySerializer(serializers.ModelSerializer):
             "type",
             "created_at",
             "modified_at",
+            "test",
         )
 
     def validate(self, data):

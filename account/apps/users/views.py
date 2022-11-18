@@ -1,4 +1,5 @@
 from currencies.models import Currency
+from django.contrib.auth import authenticate
 from rest_framework import status
 from rest_framework.authentication import TokenAuthentication
 from rest_framework.authtoken.models import Token
@@ -22,18 +23,26 @@ class UserAuth(ObtainAuthToken):
     def post(self, request, *args, **kwargs):
         serializer = self.serializer_class(data=request.data)
         serializer.is_valid(raise_exception=True)
-        user = User.objects.get(email=serializer.validated_data["email"])
-        token, created = Token.objects.get_or_create(user=user)
-        return Response(
-            {
-                "token": token.key,
-                "username": user.username,
-                "email": user.email,
-                "currency": user.default_currency.code
-                if user.default_currency
-                else None,
-            }
+        user = authenticate(
+            request,
+            username=serializer.validated_data["email"],
+            password=serializer.validated_data["password"],
         )
+        if user is not None:
+            # login(request, user)
+            token, created = Token.objects.get_or_create(user=user)
+            return Response(
+                {
+                    "token": token.key,
+                    "username": user.username,
+                    "email": user.email,
+                    "currency": user.default_currency.code
+                    if user.default_currency
+                    else None,
+                }
+            )
+        else:
+            return Response(status=status.HTTP_401_UNAUTHORIZED)
 
 
 class CurrencyView(UpdateAPIView):

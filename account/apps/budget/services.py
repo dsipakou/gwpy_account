@@ -1,7 +1,7 @@
 import datetime
+import logging
 from typing import Dict, List, Optional
 from uuid import UUID
-import logging
 
 from budget import utils
 from budget.constants import BudgetDuplicateType
@@ -14,7 +14,7 @@ from categories import constants
 from categories.models import Category
 from currencies.models import Currency
 from dateutil.relativedelta import relativedelta
-from django.db.models import Count, Max, Min, Prefetch, Q, Sum
+from django.db.models import Count, Prefetch, Q, Sum
 from django.db.models.functions import TruncMonth
 from rates.models import Rate
 from rates.utils import generate_amount_map
@@ -90,7 +90,7 @@ class BudgetService:
         cls, date_from: datetime.date, date_to: datetime.date, user: Optional[str]
     ) -> List[CategoryItem]:
         cls.start = datetime.datetime.now()
-        logger.info("budget.service.transaction_prefetch.start")
+        logger.debug("budget.service.transaction_prefetch.start")
         budget_transactions_prefetch = Prefetch(
             "transaction_set",
             queryset=Transaction.objects.select_related(
@@ -137,15 +137,17 @@ class BudgetService:
     def load_weekly_budget(
         cls, date_from, date_to, user: Optional[str]
     ) -> List[BudgetItem]:
-        budgets = Budget.objects.filter(
-            budget_date__lte=date_to, budget_date__gte=date_from
-        ).prefetch_related(
-            Prefetch(
-                "transaction_set",
-                queryset=Transaction.objects.select_related("multicurrency").all(),
-                to_attr="transactions",
-            ),
-        ).all()
+        budgets = (
+            Budget.objects.filter(budget_date__lte=date_to, budget_date__gte=date_from)
+            .prefetch_related(
+                Prefetch(
+                    "transaction_set",
+                    queryset=Transaction.objects.select_related("multicurrency").all(),
+                    to_attr="transactions",
+                ),
+            )
+            .all()
+        )
         if user:
             budgets = budgets.filter(user__uuid=user)
 
@@ -306,7 +308,9 @@ class BudgetService:
                 spent_in_original_currency = sum(
                     item["spent_in_original_currency"] for item in transactions
                 )
-                logger.debug("budget.services.make_budgets.transactions.currencies.start")
+                logger.debug(
+                    "budget.services.make_budgets.transactions.currencies.start"
+                )
                 for currency in available_currencies:
                     spent_in_currencies[currency["code"]] = sum(
                         transaction["spent_in_currencies"].get(currency["code"], 0)

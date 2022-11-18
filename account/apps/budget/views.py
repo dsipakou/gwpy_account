@@ -65,7 +65,6 @@ class PlannedBudgetList(ListAPIView):
             "dateFrom", datetime.date.today() - datetime.timedelta(days=30)
         )
         dateTo = request.GET.get("dateTo", datetime.date.today())
-
         queryset = (
             self.get_queryset()
             .select_related("user")

@@ -1,5 +1,5 @@
 from currencies.models import Currency
-from django.db.models import Window, F
+from django.db.models import F, Window
 from django.db.models.functions import RowNumber
 from rates.filters import DateFilter
 from rates.models import Rate
@@ -29,9 +29,16 @@ class RateList(ListCreateAPIView):
             )
         )
         sql, params = grouped_queryset.query.sql_with_params()
-        self.queryset = Rate.objects.raw("""
-            SELECT * FROM ({}) as seq_table WHERE seq_table.seq_number <= %s
-        """.format(sql), [*params, limit])
+        self.queryset = Rate.objects.raw(
+            """
+            SELECT *
+            FROM ({}) as seq_table
+            WHERE seq_table.seq_number <= %s
+        """.format(
+                sql
+            ),
+            [*params, limit],
+        )
         return super().get_queryset()
 
 

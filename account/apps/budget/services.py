@@ -223,10 +223,10 @@ class BudgetService:
                     "user": budget["user"],
                     "title": budget["title"],
                     "planned": budget["planned"],
-                    "planned_in_currencies": budget["planned_in_currencies"],
+                    "planned_in_currencies": budget["planned_in_currencies"].copy(),
                     "spent_in_base_currency": budget["spent_in_base_currency"],
                     "spent_in_original_currency": budget["spent_in_original_currency"],
-                    "spent_in_currencies": budget["spent_in_currencies"],
+                    "spent_in_currencies": budget["spent_in_currencies"].copy(),
                     "items": [budget],
                 }
             else:

@@ -127,8 +127,11 @@ class DuplicateBudgetView(GenericAPIView):
     serializer_class = serializers.DuplicateRequestSerializer
 
     def get(self, request, *args, **kwargs):
+        pivot_date = request.query_params.get("date")
         if (recurrent_type := request.query_params.get("type")) is not None:
-            budgets = BudgetService.get_duplicate_budget_candidates(recurrent_type)
+            budgets = BudgetService.get_duplicate_budget_candidates(
+                recurrent_type, pivot_date
+            )
             response_serializer = DuplicateResponseSerializer(data=budgets, many=True)
             response_serializer.is_valid(raise_exception=True)
             return Response(response_serializer.data)

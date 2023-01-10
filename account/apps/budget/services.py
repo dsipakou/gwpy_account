@@ -22,13 +22,13 @@ from transactions.models import Rate, Transaction
 
 RECURRENT_TYPE_MAPPING = {
     BudgetDuplicateType.MONTHLY: {
-        "start_date": utils.get_first_day_of_prev_month(),
-        "end_date": utils.get_last_day_of_prev_month(),
+        "start_date": utils.get_first_day_of_prev_month,
+        "end_date": utils.get_last_day_of_prev_month,
         "relative_date": relativedelta(months=1),
     },
     BudgetDuplicateType.WEEKLY: {
-        "start_date": utils.get_first_day_of_prev_week(),
-        "end_date": utils.get_last_day_of_prev_week(),
+        "start_date": utils.get_first_day_of_prev_week,
+        "end_date": utils.get_last_day_of_prev_week,
         "relative_date": relativedelta(weeks=1),
     },
 }
@@ -376,15 +376,19 @@ class BudgetService:
 
     @classmethod
     def get_duplicate_budget_candidates(
-        cls, recurrent_type: BudgetDuplicateType
+        cls, recurrent_type: BudgetDuplicateType, pivot_date: Optional[str] = None
     ) -> List[Dict[datetime.date, str]]:
         if RECURRENT_TYPE_MAPPING.get(recurrent_type) is None:
             raise UnsupportedDuplicateTypeError
 
         items = Budget.objects.filter(
             recurrent=recurrent_type,
-            budget_date__gte=RECURRENT_TYPE_MAPPING[recurrent_type]["start_date"],
-            budget_date__lte=RECURRENT_TYPE_MAPPING[recurrent_type]["end_date"],
+            budget_date__gte=RECURRENT_TYPE_MAPPING[recurrent_type]["start_date"](
+                pivot_date
+            ),
+            budget_date__lte=RECURRENT_TYPE_MAPPING[recurrent_type]["end_date"](
+                pivot_date
+            ),
         ).order_by("budget_date")
 
         output = []

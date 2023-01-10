@@ -19,6 +19,10 @@ class TransactionSpentInCurrencyDetails(TypedDict):
     currency: UUID
 
 
+class TransactionBudgetDetails(TypedDict):
+    title: str
+
+
 class TransactionItem(TypedDict):
     uuid: UUID
     user: UUID

@@ -19,7 +19,17 @@ class TransactionList(ListCreateAPIView):
     serializer_class = TransactionSerializer
 
     def list(self, request, *args, **kwargs):
-        transactions = TransactionService.load_transactions()
+        data = {}
+        if limit := request.GET.get("limit"):
+            try:
+                data["limit"] = int(limit)
+            except:
+                pass
+        if date_from := request.GET.get("dateFrom"):
+            data["date_from"] = date_from
+        if date_to := request.GET.get("dateTo"):
+            data["date_to"] = date_to
+        transactions = TransactionService.load_transactions(**data)
 
         serializer = self.get_serializer(transactions, many=True)
         return Response(serializer.data)

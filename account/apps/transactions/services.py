@@ -8,6 +8,7 @@ from rates.models import Rate
 from rates.utils import generate_amount_map
 from transactions.entities import (GroupedByCategory, GroupedByMonth,
                                    GroupedByParent, TransactionAccountDetails,
+                                   TransactionBudgetDetails,
                                    TransactionCategoryDetails, TransactionItem,
                                    TransactionSpentInCurrencyDetails)
 from transactions.models import Transaction, TransactionMulticurrency
@@ -47,12 +48,19 @@ class TransactionService:
             transaction.multicurrency.amount_map
         )
 
+        budget_details = None
+        if transaction.budget:
+            budget_details = TransactionBudgetDetails(
+                title=transaction.budget.title,
+            )
+
         return TransactionItem(
             uuid=transaction.uuid,
             user=transaction.user.uuid,
             category=transaction.category.uuid,
             category_details=category_details,
             budget=transaction.budget.uuid if transaction.budget else None,
+            budget_details=budget_details,
             currency=transaction.currency.uuid,
             amount=transaction.amount,
             spent_in_base_currency=transaction.spent_in_base_currency,
@@ -69,7 +77,6 @@ class TransactionService:
     def group_by_month(cls, transactions: List[Transaction]) -> List[GroupedByMonth]:
         grouped_by_month = {}
         for transaction in transactions:
-            print(transaction)
             transaction_details: TransactionItem = cls.get_transaction(transaction)
             date = transaction_details["transaction_date"]
             formatted_date = f"{date.year}-{date.month}"
@@ -91,7 +98,6 @@ class TransactionService:
                     grouped_by_month[formatted_date]["spent_in_currencies"][
                         currency
                     ] += transaction_details["spent_in_currencies"][currency]
-        print(grouped_by_month)
 
     @classmethod
     def group_by_category(cls, transactions: QuerySet) -> GroupedByCategory:
@@ -171,11 +177,16 @@ class TransactionService:
         order_by: Optional[str] = "created_at",
     ) -> List[TransactionItem]:
         transactions = []
-        qs = (
-            Transaction.objects.all()
-            .order_by(f"-{order_by}")
-            .select_related("multicurrency", "category", "account")[:limit]
-        )
+        qs = Transaction.objects.all()
+
+        if date_from and date_to:
+            qs = qs.filter(
+                transaction_date__lte=date_to, transaction_date__gte=date_from
+            )
+
+        qs = qs.order_by(f"-{order_by}").select_related(
+            "multicurrency", "category", "account", "budget"
+        )[:limit]
 
         for transaction in qs:
             transactions.append(cls.get_transaction(transaction))

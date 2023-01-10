@@ -130,7 +130,7 @@ class DuplicateRequestSerializer(serializers.Serializer):
 
     def validate_type(self, value):
         if value not in constants.ALLOWED_BUDGET_RECURRENT_TYPE:
-            return ValidatiorError("Unsupported budget reccurent type")
+            return ValidationError("Unsupported budget reccurent type")
         return value
 
 

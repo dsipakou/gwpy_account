@@ -6,12 +6,12 @@ from django.db import migrations
 class Migration(migrations.Migration):
 
     dependencies = [
-        ('transactions', '0004_alter_transactionamount_transaction'),
+        ("transactions", "0004_alter_transactionamount_transaction"),
     ]
 
     operations = [
         migrations.RenameModel(
-            old_name='TransactionAmount',
-            new_name='TransactionMulticurrency',
+            old_name="TransactionAmount",
+            new_name="TransactionMulticurrency",
         ),
     ]

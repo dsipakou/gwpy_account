@@ -48,6 +48,7 @@ INSTALLED_APPS = [
     "rates",
     "transactions",
     "users",
+    "workspaces",
 ]
 
 MIDDLEWARE = [

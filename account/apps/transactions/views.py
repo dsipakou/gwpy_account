@@ -75,8 +75,8 @@ class TransactionReportList(ListAPIView):
     serializer_class = ReportByMonthSerializer
 
     def list(self, request, *args, **kwargs):
-        date_to = datetime.strptime(request.GET["dateTo"], "%Y-%m")
-        date_from = datetime.strptime(request.GET["dateFrom"], "%Y-%m")
+        date_to = datetime.strptime(request.GET["dateTo"], "%Y-%m-%d")
+        date_from = datetime.strptime(request.GET["dateFrom"], "%Y-%m-%d")
         currency_code = request.GET.get("currency")
         response = ReportService.get_year_report(date_from, date_to, currency_code)
         serializer = self.get_serializer(response, many=True)

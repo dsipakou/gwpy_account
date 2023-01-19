@@ -56,7 +56,7 @@ class Transaction(models.Model):
                 END as grouped_amount
             FROM (
                 SELECT
-                    CONCAT(EXTRACT(YEAR FROM t.transaction_date), '-', EXTRACT(MONTH FROM t.transaction_date)) AS month,
+                    CONCAT(EXTRACT(YEAR FROM t.transaction_date), '-', LPAD(EXTRACT(MONTH FROM t.transaction_date)::text, 2, '0')) AS month,
                     EXTRACT(DAY FROM t.transaction_date) AS day,
                     SUM(
                         CASE

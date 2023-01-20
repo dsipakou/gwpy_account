@@ -11,6 +11,9 @@ class Rate(models.Model):
     )
     rate_date = models.DateField()
     rate = models.FloatField()
+    workspace = models.ForeignKey(
+        "workspaces.Workspace", to_field="uuid", on_delete=models.DO_NOTHING, null=True
+    )
     description = models.CharField(max_length=255, blank=True)
     created_at = models.DateTimeField(auto_now_add=True)
     modified_at = models.DateTimeField(auto_now=True)

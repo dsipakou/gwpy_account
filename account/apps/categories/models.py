@@ -16,6 +16,9 @@ class Category(models.Model):
         on_delete=models.CASCADE,
         to_field="uuid",
     )
+    workspace = models.ForeignKey(
+        "workspaces.Workspace", to_field="uuid", on_delete=models.DO_NOTHING, null=True
+    )
     type = models.CharField(
         max_length=3, choices=constants.CATEGORY_TYPES, default=constants.EXPENSE
     )
@@ -31,3 +34,6 @@ class Category(models.Model):
                 condition=Q(parent=None),
             ),
         ]
+
+    def __str__(self):
+        return self.name

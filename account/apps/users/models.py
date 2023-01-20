@@ -28,3 +28,6 @@ class User(AbstractUser):
 
     def currency_code(self):
         return self.default_currency.code if self.default_currency else None
+
+    def __str__(self):
+        return self.email

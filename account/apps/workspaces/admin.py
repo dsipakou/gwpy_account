@@ -1,4 +1,9 @@
 from django.contrib import admin
 from workspaces.models import Workspace
 
-admin.site.register(Workspace)
+
+class WorkspaceAdmin(admin.ModelAdmin):
+    list_display = ("uuid", "name", "owner")
+
+
+admin.site.register(Workspace, WorkspaceAdmin)

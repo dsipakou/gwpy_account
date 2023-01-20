@@ -10,7 +10,7 @@ class Currency(models.Model):
     verbal_name = models.CharField(max_length=30)
     comments = models.CharField(max_length=255, blank=True)
     workspace = models.ForeignKey(
-        "workspaces.Workspace", to_field="uuid", on_delete=models.DO_NOTHING, null=True
+        "workspaces.Workspace", to_field="uuid", on_delete=models.DO_NOTHING
     )
     is_base = models.BooleanField(default=False)
     is_default = models.BooleanField(default=False)

@@ -16,6 +16,13 @@ class RateSerializer(serializers.ModelSerializer):
             "modified_at",
         )
 
+    def create(self, validated_data):
+        user = self.context["request"].user
+        Rate.objects.create(
+            workspace=user.active_workspace,
+            **validated_data,
+        )
+
 
 class BatchedRateItemSerializer(serializers.Serializer):
     code = serializers.CharField()

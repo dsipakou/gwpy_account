@@ -25,6 +25,9 @@ class User(AbstractUser):
         blank=True,
         null=True,
     )
+    active_workspace = models.ForeignKey(
+        "workspaces.Workspace", to_field="uuid", on_delete=models.DO_NOTHING, null=True
+    )
 
     def currency_code(self):
         return self.default_currency.code if self.default_currency else None

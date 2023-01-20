@@ -17,7 +17,7 @@ class Category(models.Model):
         to_field="uuid",
     )
     workspace = models.ForeignKey(
-        "workspaces.Workspace", to_field="uuid", on_delete=models.DO_NOTHING, null=True
+        "workspaces.Workspace", to_field="uuid", on_delete=models.DO_NOTHING
     )
     type = models.CharField(
         max_length=3, choices=constants.CATEGORY_TYPES, default=constants.EXPENSE

@@ -27,3 +27,10 @@ class CategorySerializer(serializers.ModelSerializer):
             )
 
         return super().validate(data)
+
+    def create(self, validated_data):
+        user = self.context["request"].user
+        return Category.objects.create(
+            workspace=user.active_workspace,
+            **validated_data,
+        )

@@ -26,3 +26,10 @@ class CurrencySerializer(serializers.ModelSerializer):
         if value:
             Currency.objects.filter(is_default=True).update(is_default=False)
         return value
+
+    def create(self, validated_data):
+        user = self.context["request"].user
+        return Currency.objects.create(
+            workspace=user.active_workspace,
+            **validated_data,
+        )

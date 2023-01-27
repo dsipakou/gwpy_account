@@ -32,7 +32,12 @@ class BatchedRateItemSerializer(serializers.Serializer):
 class CreateBatchedRateSerializer(serializers.Serializer):
     rate_date = serializers.DateField()
     base_currency = serializers.CharField()
+    user = serializers.SerializerMethodField()
     items = BatchedRateItemSerializer(many=True)
+
+    def get_user(self, obj):
+        user = self.context["request"].user
+        return user.uuid
 
 
 class RateChartDataSerializer(serializers.Serializer):

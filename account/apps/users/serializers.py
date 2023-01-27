@@ -2,6 +2,7 @@ from django.contrib.auth.password_validation import validate_password
 from rest_framework import serializers
 from rest_framework.validators import UniqueValidator
 from users.models import User
+from workspaces.models import Workspace
 
 
 class UserSerializer(serializers.ModelSerializer):
@@ -70,5 +71,10 @@ class RegisterSerializer(serializers.ModelSerializer):
 
         user.set_password(validated_data["password"])
         user.save()
+
+        Workspace.objects.create(
+            name="default",
+            owner=user,
+        )
 
         return user

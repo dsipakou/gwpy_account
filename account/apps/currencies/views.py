@@ -7,7 +7,7 @@ from rest_framework.generics import (ListCreateAPIView,
 
 
 class CurrencyList(ListCreateAPIView):
-    queryset = Currency.objects.all()
+    queryset = Currency.objects.all().order_by("created_at")
     serializer_class = CurrencySerializer
 
 

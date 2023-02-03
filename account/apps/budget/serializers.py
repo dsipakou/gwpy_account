@@ -1,5 +1,6 @@
 from budget import constants
 from budget.models import Budget
+from transactions.models import Transaction
 from rest_framework import serializers
 from rest_framework.exceptions import ValidationError
 
@@ -138,3 +139,4 @@ class DuplicateResponseSerializer(serializers.Serializer):
     uuid = serializers.UUIDField()
     date = serializers.DateField()
     title = serializers.CharField()
+

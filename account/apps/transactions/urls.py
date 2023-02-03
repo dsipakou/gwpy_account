@@ -13,4 +13,5 @@ urlpatterns = [
     ),
     path("report/", views.TransactionReportList.as_view(), name="transaction_report"),
     path("income/", views.TransactionIncomeList.as_view(), name="transaction_income"),
+    path("budget/<uuid:uuid>/", views.BudgetTransactions.as_view(), name="budget_transactions")
 ]

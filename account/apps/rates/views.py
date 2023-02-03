@@ -11,6 +11,7 @@ from rates.utils import generate_date_seq
 from rest_framework.generics import (CreateAPIView, GenericAPIView,
                                      ListAPIView, ListCreateAPIView,
                                      RetrieveUpdateDestroyAPIView)
+from rest_framework.permissions import IsAuthenticated
 from rest_framework.response import Response
 from rest_framework.status import HTTP_400_BAD_REQUEST
 
@@ -18,6 +19,7 @@ from rest_framework.status import HTTP_400_BAD_REQUEST
 class RateList(ListCreateAPIView):
     pagination_class = None
     serializer_class = RateSerializer
+    permission_classes = (IsAuthenticated,)
 
     def get_queryset(self):
         limit = int(self.request.GET.get("limit", 60))

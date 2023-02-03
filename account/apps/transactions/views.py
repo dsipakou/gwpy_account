@@ -48,6 +48,15 @@ class TransactionList(ListCreateAPIView):
         )
 
 
+class BudgetTransactions(ListAPIView):
+    serializer_class = TransactionSerializer
+    
+    def list(self, request, uuid, *args, **kwargs):
+        transactions = Transaction.objects.filter(budget__uuid=uuid)
+        serializer = self.get_serializer(transactions, many=True)
+        return Response(serializer.data)
+
+
 class TransactionDetails(RetrieveUpdateDestroyAPIView):
     queryset = Transaction.objects.all()
     serializer_class = TransactionDetailsSerializer

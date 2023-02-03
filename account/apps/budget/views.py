@@ -38,7 +38,7 @@ class BudgetList(ListCreateAPIView):
 
 
 class BudgetDetails(RetrieveUpdateDestroyAPIView):
-    queryset = Budget.objects.all()
+    queryset = Budget.objects.prefetch_related('transaction_set')
     serializer_class = serializers.BudgetSerializer
     lookup_field = "uuid"
 

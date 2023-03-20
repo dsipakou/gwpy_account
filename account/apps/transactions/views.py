@@ -1,6 +1,7 @@
 from datetime import date, datetime, timedelta
 
 from categories import constants
+from django.db.models.query import QuerySet
 from rest_framework import status
 from rest_framework.generics import (ListAPIView, ListCreateAPIView,
                                      RetrieveUpdateDestroyAPIView)
@@ -50,9 +51,24 @@ class TransactionList(ListCreateAPIView):
 
 class BudgetTransactions(ListAPIView):
     serializer_class = TransactionSerializer
-    
-    def list(self, request, uuid, *args, **kwargs):
-        transactions = Transaction.objects.filter(budget__uuid=uuid)
+
+    def get_queryset(self) -> QuerySet:
+        return (
+            Transaction.objects.filter(budget__uuid=self.kwargs["uuid"])
+            .select_related(
+                "account",
+                "budget",
+                "category",
+                "category__parent",
+                "currency",
+                "multicurrency",
+                "user",
+            )
+            .order_by("transaction_date")
+        )
+
+    def list(self, request, *args, **kwargs):
+        transactions = TransactionService.proceed_transactions(self.get_queryset())
         serializer = self.get_serializer(transactions, many=True)
         return Response(serializer.data)
 
@@ -63,7 +79,12 @@ class TransactionDetails(RetrieveUpdateDestroyAPIView):
     lookup_field = "uuid"
 
     def update(self, request, *args, **kwargs):
-        return super().update(request, *args, **kwargs)
+        instance = self.get_object()
+        serializer = self.get_serializer(instance, data=request.data, partial=True)
+        serializer.is_valid(raise_exception=True)
+        self.perform_update(serializer)
+        TransactionService.create_transaction_multicurrency_amount([instance.uuid])
+        return Response(serializer.data, status=status.HTTP_200_OK)
 
 
 class TransactionGroupedList(ListAPIView):

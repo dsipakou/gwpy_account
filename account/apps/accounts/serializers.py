@@ -16,3 +16,13 @@ class AccountSerializer(serializers.ModelSerializer):
             "created_at",
             "modified_at",
         )
+
+    def create(self, validated_data):
+        workspace = validated_data["user"].active_workspace
+        if not workspace:
+            raise ValidationError("User has no active workspace")
+        data = {
+            **validated_data,
+            "workspace": workspace,
+        }
+        return super().create(data)

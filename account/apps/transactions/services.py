@@ -63,7 +63,6 @@ class TransactionService:
             budget_details=budget_details,
             currency=transaction.currency.uuid,
             amount=transaction.amount,
-            spent_in_base_currency=transaction.spent_in_base_currency,
             spent_in_currencies=spent_details,
             account=transaction.account.uuid,
             account_details=account_details,
@@ -188,7 +187,15 @@ class TransactionService:
             "multicurrency", "category", "account", "budget"
         )[:limit]
 
-        for transaction in qs:
+        return cls.proceed_transactions(qs)
+
+    @classmethod
+    def proceed_transactions(
+        cls,
+        queryset: QuerySet,
+    ) -> List[TransactionItem]:
+        transactions = []
+        for transaction in queryset:
             transactions.append(cls.get_transaction(transaction))
         return transactions
 

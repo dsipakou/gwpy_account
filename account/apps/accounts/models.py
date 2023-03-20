@@ -10,6 +10,9 @@ class Account(models.Model):
     category = models.ForeignKey(
         "categories.Category", to_field="uuid", null=True, on_delete=models.DO_NOTHING
     )
+    workspace = models.ForeignKey(
+        "workspaces.Workspace", to_field="uuid", on_delete=models.DO_NOTHING
+    )
     description = models.CharField(max_length=255, blank=True)
     is_main = models.BooleanField(default=False)
     created_at = models.DateTimeField(auto_now_add=True)

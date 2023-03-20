@@ -51,7 +51,7 @@ class BudgetService:
 
     @classmethod
     def get_archive(
-        cls, current_date: datetime.date, category_uuid: str
+        cls, qs, current_date: datetime.date, category_uuid: str
     ) -> List[MonthUsageSum]:
         archive = []
         start_date = datetime.date.fromisoformat(current_date).replace(
@@ -60,7 +60,7 @@ class BudgetService:
         end_date = start_date + relativedelta(months=6)
 
         archive_sum = (
-            Budget.objects.annotate(month=TruncMonth("budget_date"))
+            qs.annotate(month=TruncMonth("budget_date"))
             .filter(
                 budget_date__gte=start_date,
                 budget_date__lt=end_date,
@@ -87,7 +87,11 @@ class BudgetService:
 
     @classmethod
     def load_budget(
-        cls, date_from: datetime.date, date_to: datetime.date, user: Optional[str]
+        cls,
+        queryset,
+        date_from: datetime.date,
+        date_to: datetime.date,
+        user: Optional[str],
     ) -> List[CategoryItem]:
         cls.start = datetime.datetime.now()
         logger.debug("budget.service.transaction_prefetch.start")
@@ -99,7 +103,7 @@ class BudgetService:
             to_attr="transactions",
         )
         budgets = (
-            Budget.objects.filter(budget_date__lte=date_to, budget_date__gte=date_from)
+            queryset.filter(budget_date__lte=date_to, budget_date__gte=date_from)
             .prefetch_related(budget_transactions_prefetch)
             .select_related("currency", "category", "multicurrency", "user")
             .order_by("title")
@@ -135,10 +139,10 @@ class BudgetService:
 
     @classmethod
     def load_weekly_budget(
-        cls, date_from, date_to, user: Optional[str]
+        cls, qs, date_from, date_to, user: Optional[str]
     ) -> List[BudgetItem]:
         budgets = (
-            Budget.objects.filter(budget_date__lte=date_to, budget_date__gte=date_from)
+            qs.filter(budget_date__lte=date_to, budget_date__gte=date_from)
             .prefetch_related(
                 Prefetch(
                     "transaction_set",
@@ -376,12 +380,12 @@ class BudgetService:
 
     @classmethod
     def get_duplicate_budget_candidates(
-        cls, recurrent_type: BudgetDuplicateType, pivot_date: Optional[str] = None
+        cls, qs, recurrent_type: BudgetDuplicateType, pivot_date: Optional[str] = None
     ) -> List[Dict[datetime.date, str]]:
         if RECURRENT_TYPE_MAPPING.get(recurrent_type) is None:
             raise UnsupportedDuplicateTypeError
 
-        items = Budget.objects.filter(
+        items = qs.filter(
             recurrent=recurrent_type,
             budget_date__gte=RECURRENT_TYPE_MAPPING[recurrent_type]["start_date"](
                 pivot_date

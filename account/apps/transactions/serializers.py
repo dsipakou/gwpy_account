@@ -32,7 +32,6 @@ class TransactionSerializer(serializers.Serializer):
     currency = serializers.UUIDField()
     amount = serializers.FloatField()
     spent_in_currencies = serializers.DictField(read_only=True)
-    spent_in_base_currency = serializers.FloatField(read_only=True)
     account = serializers.UUIDField()
     account_details = TransactionAccountSerializer(read_only=True)
     description = serializers.CharField(allow_blank=True, allow_null=True)

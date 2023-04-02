@@ -1,5 +1,7 @@
 from rest_framework.permissions import BasePermission
 
-class AccountPermissions(BasePermission):
-    def has_read_permission(self, request, view, obj):
-        return obj.is_workspace_member(request.user)
+
+class BaseAccountPermission(BasePermission):
+    def has_object_permission(self, request, view, obj):
+        user = request.user
+        return user == obj.user or obj.workspace.owner == user

@@ -88,6 +88,31 @@ class Transaction(models.Model):
         return grouped_transactions
 
     @classmethod
+    def grouped_by_month_and_category(cls, date_from: str, date_to: str, currency: str):
+        """
+            expecting date_from and date_to in 'YYYY-MM' format
+        """
+        raw_sql = textwrap.dedent(
+            """
+                SELECT 
+                    SUM((amount_map->>'%s')::NUMERIC) AS sum_amount,
+                    pcc.name,
+                    to_char(date(tt.transaction_date), 'YYYY-MM') AS year_month
+                FROM transactions_transaction tt
+                INNER JOIN categories_category cc ON cc.uuid = tt.category_id
+                INNER JOIN categories_category pcc ON pcc.uuid = cc.parent_id
+                INNER JOIN transactions_transactionmulticurrency ttm ON ttm.transaction_id = tt.uuid
+                GROUP BY year_month, cc1.name
+                HAVING to_char(date(tt.transaction_date), 'YYYY-MM') BETWEEN '%s' AND '%s'
+                ORDER BY year_month;
+            """
+        )
+        with connection.cursor() as cursor:
+            cursor.execute(
+                raw_sql, [currency, date_from, date_to]
+            )
+
+    @classmethod
     def income_grouped_by_income(cls, date_from: str, date_to: str):
         raw_sql = textwrap.dedent(
             """

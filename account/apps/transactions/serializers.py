@@ -94,7 +94,7 @@ class TransactionDetailsSerializer(serializers.ModelSerializer):
 class ReportByMonthSerializer(serializers.Serializer):
     month = serializers.CharField()
     day = serializers.IntegerField()
-    grouped_amount = serializers.IntegerField()
+    grouped_amount = serializers.FloatField()
 
 
 class IncomeSerializer(serializers.ModelSerializer):

@@ -97,6 +97,16 @@ class ReportByMonthSerializer(serializers.Serializer):
     grouped_amount = serializers.FloatField()
 
 
+class ReportCategoryDetailsSerializer(serializers.Serializer):
+    name = serializers.CharField()
+    value = serializers.FloatField()
+
+
+class ReportChartSerializer(serializers.Serializer):
+    date = serializers.DateField(format="%Y-%m")
+    categories = serializers.ListField(child=ReportCategoryDetailsSerializer())
+
+
 class IncomeSerializer(serializers.ModelSerializer):
     class Meta:
         model = Transaction

@@ -1,8 +1,10 @@
 import copy
+import datetime
 from typing import Dict, List, Optional
 from uuid import UUID
 
 from categories import constants as category_constants
+from categories.models import Category
 from django.db.models import QuerySet
 from rates.models import Rate
 from rates.utils import generate_amount_map
@@ -222,3 +224,52 @@ class ReportService:
     @classmethod
     def get_year_report(cls, date_from: str, date_to: str, currency_code: str):
         return Transaction.grouped_by_month(date_from, date_to, currency_code)
+
+    @classmethod
+    def get_chart_report(cls, date_from: str, date_to: str, currency_code: str):
+        grouped_transactions = Transaction.grouped_by_month_and_category(
+            date_from, date_to, currency_code
+        )
+
+        grouped_map = cls._get_grouped_map(grouped_transactions)
+
+        start_date = date_from
+        end_date = date_to
+
+        month_year_list = []
+        while start_date < end_date:
+            month_year_list.append(start_date.strftime("%Y-%m"))
+            start_date = start_date.replace(day=1) + datetime.timedelta(days=32)
+            start_date = start_date.replace(day=1)
+
+        categories_list = (
+            Category.objects.values_list("name", flat=True)
+            .filter(parent__isnull=True, type=category_constants.EXPENSE)
+            .order_by("name")
+        )
+
+        output = []
+        for date_item in month_year_list:
+            current_item = {}
+            current_item["date"] = date_item
+            grouped_item = grouped_map.get(date_item, {})
+            current_date_category_list = []
+            for category in categories_list:
+                categories_map = {}
+                categories_map["name"] = category
+                categories_map["value"] = grouped_item.get(category, 0)
+                current_date_category_list.append(categories_map)
+            current_item["categories"] = current_date_category_list
+            output.append(current_item)
+
+        return output
+
+    @classmethod
+    def _get_grouped_map(cls, qs):
+        output = {}
+        for item in qs:
+            key = item["year_month"].strftime("%Y-%m")
+            output[key] = output.get(key, {})
+            output[key][item["category__parent__name"]] = item["parent_sum"]
+
+        return output

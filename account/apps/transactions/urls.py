@@ -12,6 +12,11 @@ urlpatterns = [
         name="transaction_grouped_list",
     ),
     path("report/", views.TransactionReportList.as_view(), name="transaction_report"),
+    path(
+        "report-monthly/",
+        views.TransactionReportMonthly.as_view(),
+        name="transaction_report_monthly",
+    ),
     path("income/", views.TransactionIncomeList.as_view(), name="transaction_income"),
     path(
         "budget/<uuid:uuid>/",

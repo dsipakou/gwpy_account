@@ -10,6 +10,8 @@ from transactions.models import Transaction
 from transactions.serializers import (GroupedTransactionSerializer,
                                       IncomeSerializer,
                                       ReportByMonthSerializer,
+                                      ReportCategoryDetailsSerializer,
+                                      ReportChartSerializer,
                                       TransactionCreateSerializer,
                                       TransactionDetailsSerializer,
                                       TransactionSerializer)
@@ -111,6 +113,18 @@ class TransactionReportList(ListAPIView):
         response = ReportService.get_year_report(date_from, date_to, currency_code)
         serializer = self.get_serializer(response, many=True)
         return Response(serializer.data)
+
+
+class TransactionReportMonthly(ListAPIView):
+    serializer_class = ReportChartSerializer
+
+    def list(self, request, *args, **kwargs):
+        date_to = datetime.strptime(request.GET["dateTo"], "%Y-%m-%d")
+        date_from = datetime.strptime(request.GET["dateFrom"], "%Y-%m-%d")
+        currency_code = request.GET.get("currency")
+        data = ReportService.get_chart_report(date_from, date_to, currency_code)
+        serializer = self.get_serializer(data, many=True)
+        return Response(status=200, data=serializer.data)
 
 
 class TransactionIncomeList(ListAPIView):

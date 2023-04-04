@@ -3,7 +3,10 @@ import uuid
 
 from categories import constants as category_constants
 from currencies.models import Currency
+from django.contrib.postgres.aggregates import StringAgg
 from django.db import connection, models
+from django.db.models.fields.json import KeyTextTransform
+from django.db.models.functions import Cast, Trunc
 from rates.models import Rate
 from transactions.utils import dictfetchall
 
@@ -88,29 +91,33 @@ class Transaction(models.Model):
         return grouped_transactions
 
     @classmethod
-    def grouped_by_month_and_category(cls, date_from: str, date_to: str, currency: str):
-        """
-            expecting date_from and date_to in 'YYYY-MM' format
-        """
-        raw_sql = textwrap.dedent(
-            """
-                SELECT 
-                    SUM((amount_map->>'%s')::NUMERIC) AS sum_amount,
-                    pcc.name,
-                    to_char(date(tt.transaction_date), 'YYYY-MM') AS year_month
-                FROM transactions_transaction tt
-                INNER JOIN categories_category cc ON cc.uuid = tt.category_id
-                INNER JOIN categories_category pcc ON pcc.uuid = cc.parent_id
-                INNER JOIN transactions_transactionmulticurrency ttm ON ttm.transaction_id = tt.uuid
-                GROUP BY year_month, cc1.name
-                HAVING to_char(date(tt.transaction_date), 'YYYY-MM') BETWEEN '%s' AND '%s'
-                ORDER BY year_month;
-            """
-        )
-        with connection.cursor() as cursor:
-            cursor.execute(
-                raw_sql, [currency, date_from, date_to]
+    def grouped_by_month_and_category(
+        cls, date_from: str, date_to: str, currency_code: str
+    ):
+        qs = (
+            Transaction.objects.select_related(
+                "category", "category__parent", "multicurrency"
             )
+            .values("category__parent", "category__parent__name")
+            .annotate(
+                parent_sum=models.Sum(
+                    Cast(
+                        KeyTextTransform(currency_code, "multicurrency__amount_map"),
+                        models.FloatField(),
+                    )
+                )
+            )
+            .annotate(
+                year_month=Trunc(
+                    "transaction_date", "month", output_field=models.DateField()
+                )
+            )
+            .annotate(transaction_count=models.Count("pk"))
+            .filter(year_month__lte=date_to, year_month__gte=date_from)
+            .order_by("year_month", "category__parent__name")
+        )
+
+        return qs
 
     @classmethod
     def income_grouped_by_income(cls, date_from: str, date_to: str):

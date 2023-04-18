@@ -122,9 +122,12 @@ class TransactionReportMonthly(ListAPIView):
         date_to = datetime.strptime(request.GET["dateTo"], "%Y-%m-%d")
         date_from = datetime.strptime(request.GET["dateFrom"], "%Y-%m-%d")
         currency_code = request.GET.get("currency")
-        data = ReportService.get_chart_report(date_from, date_to, currency_code)
+        number_of_days = request.GET.get("numberOfDays")
+        data = ReportService.get_chart_report(
+            date_from, date_to, currency_code, number_of_days
+        )
         serializer = self.get_serializer(data, many=True)
-        return Response(status=200, data=serializer.data)
+        return Response(serializer.data)
 
 
 class TransactionIncomeList(ListAPIView):

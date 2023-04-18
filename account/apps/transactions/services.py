@@ -226,9 +226,15 @@ class ReportService:
         return Transaction.grouped_by_month(date_from, date_to, currency_code)
 
     @classmethod
-    def get_chart_report(cls, date_from: str, date_to: str, currency_code: str):
+    def get_chart_report(
+        cls,
+        date_from: str,
+        date_to: str,
+        currency_code: str,
+        till_day: Optional[int] = None,
+    ):
         grouped_transactions = Transaction.grouped_by_month_and_category(
-            date_from, date_to, currency_code
+            date_from, date_to, currency_code, till_day
         )
 
         grouped_map = cls._get_grouped_map(grouped_transactions)

@@ -1,5 +1,7 @@
+import datetime
 import textwrap
 import uuid
+from typing import Optional
 
 from categories import constants as category_constants
 from currencies.models import Currency
@@ -7,6 +9,7 @@ from django.contrib.postgres.aggregates import StringAgg
 from django.db import connection, models
 from django.db.models.fields.json import KeyTextTransform
 from django.db.models.functions import Cast, Trunc
+from django.db.models.functions.datetime import TruncMonth
 from rates.models import Rate
 from transactions.utils import dictfetchall
 
@@ -92,7 +95,7 @@ class Transaction(models.Model):
 
     @classmethod
     def grouped_by_month_and_category(
-        cls, date_from: str, date_to: str, currency_code: str
+        cls, date_from: str, date_to: str, currency_code: str, till_day: Optional[int]
     ):
         qs = (
             Transaction.objects.select_related(
@@ -113,11 +116,17 @@ class Transaction(models.Model):
                 )
             )
             .annotate(transaction_count=models.Count("pk"))
-            .filter(year_month__lte=date_to, year_month__gte=date_from)
-            .order_by("year_month", "category__parent__name")
+            .filter(transaction_date__range=(date_from, date_to))
         )
 
-        return qs
+        if till_day is not None:
+            qs = qs.filter(
+                transaction_date__lte=TruncMonth("transaction_date")
+                + models.Value(datetime.timedelta(days=int(till_day)))
+                - models.Value(datetime.timedelta(seconds=1))
+            )
+
+        return qs.order_by("year_month", "category__parent__name")
 
     @classmethod
     def income_grouped_by_income(cls, date_from: str, date_to: str):

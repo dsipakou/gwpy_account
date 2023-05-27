@@ -6,6 +6,13 @@ RUN apt-get update && \
 
 ARG APP_DIR=/var/app
 
+ENV PYTHONDONTWRITEBYTECODE 1
+ENV PYTHONUNBUFFERED 1
+
+RUN apt-get update && apt-get install -y \
+    build-essential \
+    libpq-dev
+
 RUN curl -sSL https://install.python-poetry.org | python3 -
 
 ENV PATH="${HOME}/.local/bin:${PATH}"
@@ -18,5 +25,4 @@ RUN make install-packages opts="--no-dev"
 
 COPY account/ /var/app/account/
 
-CMD ["make", "run-server"]
-
+CMD ["make", "uvicorn-server"]

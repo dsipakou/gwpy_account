@@ -5,3 +5,8 @@ CATEGORY_TYPES = (
     (INCOME, "Income"),
     (EXPENSE, "Expense"),
 )
+
+CategoryType = (
+    INCOME,
+    EXPENSE,
+)

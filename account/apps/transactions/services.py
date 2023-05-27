@@ -1,6 +1,6 @@
 import copy
 import datetime
-from typing import Dict, List, Optional
+from typing import Dict, List, Optional, Union
 from uuid import UUID
 
 from categories import constants as category_constants
@@ -14,6 +14,8 @@ from transactions.entities import (GroupedByCategory, GroupedByMonth,
                                    TransactionCategoryDetails, TransactionItem,
                                    TransactionSpentInCurrencyDetails)
 from transactions.models import Transaction, TransactionMulticurrency
+
+from account.apps.categories.constants import CategoryType
 
 
 class TransactionService:
@@ -172,17 +174,20 @@ class TransactionService:
     def load_transactions(
         cls,
         *,
-        limit: Optional[int] = 15,
+        limit: int = 15,
+        order_by: str = "created_at",
+        category_type: Union[
+            category_constants.INCOME, category_constants.EXPENSE
+        ] = category_constants.EXPENSE,
         date_from: Optional[str] = None,
         date_to: Optional[str] = None,
-        order_by: Optional[str] = "created_at",
     ) -> List[TransactionItem]:
-        transactions = []
-        qs = Transaction.objects.all()
+        qs = Transaction.objects.filter(category__type=category_type).select_related("category")
 
         if date_from and date_to:
             qs = qs.filter(
-                transaction_date__lte=date_to, transaction_date__gte=date_from
+                transaction_date__lte=date_to,
+                transaction_date__gte=date_from,
             )
 
         qs = qs.order_by(f"-{order_by}").select_related(

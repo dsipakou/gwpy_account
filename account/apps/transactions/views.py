@@ -10,7 +10,6 @@ from transactions.models import Transaction
 from transactions.serializers import (GroupedTransactionSerializer,
                                       IncomeSerializer,
                                       ReportByMonthSerializer,
-                                      ReportCategoryDetailsSerializer,
                                       ReportChartSerializer,
                                       TransactionCreateSerializer,
                                       TransactionDetailsSerializer,
@@ -32,6 +31,12 @@ class TransactionList(ListCreateAPIView):
             data["date_from"] = date_from
         if date_to := request.GET.get("dateTo"):
             data["date_to"] = date_to
+        if transaction_type := request.GET.get("type"):
+            if (transaction_type == 'outcome'):
+                data["category_type"] = constants.EXPENSE
+            else:
+                data["category_type"] = constants.INCOME
+
         transactions = TransactionService.load_transactions(**data)
 
         serializer = self.get_serializer(transactions, many=True)

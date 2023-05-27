@@ -14,3 +14,7 @@ install: install-poetry install-packages
 .PHONY: run-server
 run-server: 
 	$(POETRY) run python manage.py runserver
+
+.PHONY: uvicorn-server
+uvicorn-server:
+	$(POETRY) run uvicorn account.asgi:application --host 0.0.0.0

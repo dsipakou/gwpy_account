@@ -22,20 +22,26 @@ class TransactionList(ListCreateAPIView):
 
     def list(self, request, *args, **kwargs):
         data = {}
+
         if limit := request.GET.get("limit"):
             try:
                 data["limit"] = int(limit)
             except:
                 pass
+
         if date_from := request.GET.get("dateFrom"):
             data["date_from"] = date_from
+
         if date_to := request.GET.get("dateTo"):
             data["date_to"] = date_to
+
         if transaction_type := request.GET.get("type"):
             if (transaction_type == 'outcome'):
                 data["category_type"] = constants.EXPENSE
             else:
                 data["category_type"] = constants.INCOME
+
+        data["order_by"] = "transaction_date"
 
         transactions = TransactionService.load_transactions(**data)
 

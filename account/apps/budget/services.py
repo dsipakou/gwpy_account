@@ -106,7 +106,7 @@ class BudgetService:
             queryset.filter(budget_date__lte=date_to, budget_date__gte=date_from)
             .prefetch_related(budget_transactions_prefetch)
             .select_related("currency", "category", "multicurrency", "user")
-            .order_by("title")
+            .order_by("budget_date")
         )
 
         if user:
@@ -129,7 +129,6 @@ class BudgetService:
                     ),
                 ),
             )
-            .filter(budget_count__gt=0)
             .order_by("name")
         )
 
@@ -151,6 +150,7 @@ class BudgetService:
                 ),
             )
             .all()
+            .order_by("created_at")
         )
         if user:
             budgets = budgets.filter(user__uuid=user)

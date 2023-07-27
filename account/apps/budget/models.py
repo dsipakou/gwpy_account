@@ -29,6 +29,9 @@ class Budget(models.Model):
     created_at = models.DateTimeField(auto_now_add=True)
     modified_at = models.DateTimeField(auto_now=True)
 
+    class Meta:
+        unique_together = ["title", "budget_date", "user"]
+
 
 class BudgetMulticurrency(models.Model):
     uuid = models.UUIDField(unique=True, default=uuid.uuid4, editable=False)

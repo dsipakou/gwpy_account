@@ -12,6 +12,7 @@ class CategorySerializer(serializers.ModelSerializer):
             "name",
             "parent",
             "type",
+            "description",
             "created_at",
             "modified_at",
             "test",

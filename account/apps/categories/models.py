@@ -22,6 +22,7 @@ class Category(models.Model):
     type = models.CharField(
         max_length=3, choices=constants.CATEGORY_TYPES, default=constants.EXPENSE
     )
+    description = models.CharField(max_length=255, blank=True)
     created_at = models.DateTimeField(auto_now_add=True)
     modified_at = models.DateTimeField(auto_now=True)
 

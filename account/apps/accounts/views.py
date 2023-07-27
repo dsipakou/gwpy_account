@@ -15,9 +15,9 @@ class AccountList(ListCreateAPIView):
         user = self.request.user
         workspace = user.active_workspace
         if user == workspace.owner:
-            return Account.objects.filter(workspace=workspace)
+            return Account.objects.filter(workspace=workspace).order_by("is_main", "created_at")
 
-        return Account.objects.filter(user=user)
+        return Account.objects.filter(user=user).order_by("created_at")
 
 
 class AccountDetails(RetrieveUpdateDestroyAPIView):

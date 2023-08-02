@@ -11,13 +11,13 @@ from rest_framework.generics import (GenericAPIView, ListAPIView,
                                      ListCreateAPIView,
                                      RetrieveUpdateDestroyAPIView)
 from rest_framework.response import Response
-
-from account.apps.users.filters import FilterByUser
+from users.filters import FilterByUser
+from users.permissions import BaseUserPermission
 
 
 class BudgetList(ListCreateAPIView):
     queryset = Budget.objects.select_related("category").all()
-    # filter_backends = (FilterByUser, )
+    filter_backends = (FilterByUser,)
     serializer_class = serializers.BudgetSerializer
 
     def create(self, request, *args, **kwargs):
@@ -42,8 +42,8 @@ class BudgetList(ListCreateAPIView):
 
 class BudgetDetails(RetrieveUpdateDestroyAPIView):
     queryset = Budget.objects.prefetch_related("transaction_set")
-    # filter_backends = (FilterByUser,)
     serializer_class = serializers.BudgetSerializer
+    permission_classes = (BaseUserPermission,)
     lookup_field = "uuid"
 
     def perform_update(self, serializer):
@@ -62,7 +62,7 @@ class BudgetDetails(RetrieveUpdateDestroyAPIView):
 class PlannedBudgetList(ListAPIView):
     authentication_classes = (TokenAuthentication,)
     queryset = Budget.objects.all()
-    # filter_backends = (FilterByUser,)
+    filter_backends = (FilterByUser,)
     serializer_class = serializers.PlannedBudgetSerializer
 
     def list(self, request, *args, **kwargs):
@@ -84,7 +84,7 @@ class PlannedBudgetList(ListAPIView):
 
 class ActualUsageBudgetList(ListAPIView):
     queryset = Budget.objects.all()
-    # filter_backends = (FilterByUser,)
+    filter_backends = (FilterByUser,)
     serializer_class = serializers.CategoryBudgetSerializer
 
     def list(self, request, *args, **kwargs):
@@ -104,7 +104,7 @@ class ActualUsageBudgetList(ListAPIView):
 
 class WeeklyUsageList(ListAPIView):
     queryset = Budget.objects.all()
-    # filter_backends = (FilterByUser, )
+    filter_backends = (FilterByUser,)
     serializer_class = serializers.BudgetUsageSerializer
 
     def list(self, request, *args, **kwargs):
@@ -125,7 +125,7 @@ class WeeklyUsageList(ListAPIView):
 
 class ArchiveView(ListAPIView):
     queryset = Budget.objects.all()
-    # filter_backends = (FilterByUser,)
+    filter_backends = (FilterByUser,)
     serializer_class = serializers.ArchiveSerializer
 
     def list(self, request, *args, **kwargs):
@@ -142,8 +142,9 @@ class ArchiveView(ListAPIView):
 
 class DuplicateBudgetView(GenericAPIView):
     queryset = Budget.objects.all()
-    # filter_backends = (FilterByUser,)
+    filter_backends = (FilterByUser,)
     serializer_class = serializers.DuplicateRequestSerializer
+    permission_classes = (BaseUserPermission,)
 
     def get(self, request, *args, **kwargs):
         pivot_date = request.query_params.get("date")

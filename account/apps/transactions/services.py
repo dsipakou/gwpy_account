@@ -182,7 +182,9 @@ class TransactionService:
         date_from: Optional[str] = None,
         date_to: Optional[str] = None,
     ) -> List[TransactionItem]:
-        qs = Transaction.objects.filter(category__type=category_type).select_related("category")
+        qs = Transaction.objects.filter(category__type=category_type).select_related(
+            "category"
+        )
 
         if date_from and date_to:
             qs = qs.filter(

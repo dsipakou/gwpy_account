@@ -15,7 +15,6 @@ from users.serializers import (ChangeDefaultCurrencySerializer,
 
 class UserList(ListAPIView):
     serializer_class = UserSerializer
-    authentication_classes = (TokenAuthentication,)
 
     def get_queryset(self):
         return self.request.user.active_workspace.members

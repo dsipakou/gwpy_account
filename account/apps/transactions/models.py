@@ -24,6 +24,13 @@ class Transaction(models.Model):
         "budget.Budget", on_delete=models.DO_NOTHING, to_field="uuid", null=True
     )
     currency = models.ForeignKey(Currency, on_delete=models.DO_NOTHING, to_field="uuid")
+    workspace = models.ForeignKey(
+        "workspaces.Workspace",
+        to_field="uuid",
+        null=True,
+        blank=True,
+        on_delete=models.DO_NOTHING,
+    )
     amount = models.FloatField()
     account = models.ForeignKey(
         "accounts.Account", on_delete=models.DO_NOTHING, to_field="uuid"

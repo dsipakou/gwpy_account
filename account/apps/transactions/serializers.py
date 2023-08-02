@@ -1,4 +1,5 @@
 from rest_framework import serializers
+from rest_framework.exceptions import ValidationError
 from transactions.models import Transaction
 
 
@@ -71,6 +72,16 @@ class TransactionCreateSerializer(serializers.ModelSerializer):
             "description",
             "transaction_date",
         )
+
+    def create(self, validated_data):
+        workspace = validated_data["user"].active_workspace
+        if not workspace:
+            raise ValidationError("User has no active workspace")
+        data = {
+            **validated_data,
+            "workspace": workspace,
+        }
+        return super().create(data)
 
 
 class TransactionDetailsSerializer(serializers.ModelSerializer):

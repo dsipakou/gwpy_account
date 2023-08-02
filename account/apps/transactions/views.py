@@ -36,7 +36,7 @@ class TransactionList(ListCreateAPIView):
             data["date_to"] = date_to
 
         if transaction_type := request.GET.get("type"):
-            if (transaction_type == 'outcome'):
+            if transaction_type == "outcome":
                 data["category_type"] = constants.EXPENSE
             else:
                 data["category_type"] = constants.INCOME

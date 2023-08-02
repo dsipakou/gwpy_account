@@ -1,23 +1,20 @@
 from accounts.models import Account
 from accounts.permissions import BaseAccountPermission
 from accounts.serializers import AccountSerializer
+from rest_framework import status
 from rest_framework.generics import (ListCreateAPIView,
                                      RetrieveUpdateDestroyAPIView)
 from rest_framework.response import Response
-from rest_framework import status
 from transactions.models import Transaction
+from users.filters import FilterByUser
+from users.permissions import BaseUserPermission
 
 
 class AccountList(ListCreateAPIView):
+    queryset = Account.objects.order_by("is_main", "created_at")
     serializer_class = AccountSerializer
-
-    def get_queryset(self):
-        user = self.request.user
-        workspace = user.active_workspace
-        if user == workspace.owner:
-            return Account.objects.filter(workspace=workspace).order_by("is_main", "created_at")
-
-        return Account.objects.filter(user=user).order_by("created_at")
+    permission_classes = (BaseUserPermission,)
+    filter_backends = (FilterByUser,)
 
 
 class AccountDetails(RetrieveUpdateDestroyAPIView):
@@ -29,7 +26,10 @@ class AccountDetails(RetrieveUpdateDestroyAPIView):
     def destroy(self, request, *args, **kwargs):
         instance = self.get_object()
         if Transaction.objects.filter(account=instance).exists():
-            return Response(status=status.HTTP_403_FORBIDDEN, data={'error': 'This category has at least one transaction'})
+            return Response(
+                status=status.HTTP_403_FORBIDDEN,
+                data={"error": "This category has at least one transaction"},
+            )
 
         self.perform_destroy(instance)
         return Response(status=status.HTTP_204_NO_CONTENT)

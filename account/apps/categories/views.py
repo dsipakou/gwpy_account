@@ -4,13 +4,15 @@ from categories.serializers import CategorySerializer
 from rest_framework.exceptions import ValidationError
 from rest_framework.generics import (ListCreateAPIView,
                                      RetrieveUpdateDestroyAPIView)
-from rest_framework.permissions import IsAuthenticated
 from transactions.models import Transaction
+from users.filters import FilterByUser
+from users.permissions import BaseUserPermission
 
 
 class CategoryList(ListCreateAPIView):
     queryset = Category.objects.all().select_related("parent").order_by("name")
     serializer_class = CategorySerializer
+    filter_backends = (FilterByUser,)
 
     def perform_create(self, serializer):
         """Check if parent category is not a child of any other category
@@ -30,6 +32,7 @@ class CategoryList(ListCreateAPIView):
 class CategoryDetails(RetrieveUpdateDestroyAPIView):
     queryset = Category.objects.all()
     serializer_class = CategorySerializer
+    permission_classes = (BaseUserPermission,)
     lookup_field = "uuid"
 
     def perform_update(self, serializer):

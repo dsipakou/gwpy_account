@@ -4,15 +4,19 @@ from rates.models import Rate
 from rest_framework.exceptions import ValidationError
 from rest_framework.generics import (ListCreateAPIView,
                                      RetrieveUpdateDestroyAPIView)
+from users.filters import FilterByUser
+from workspaces.filters import FilterByWorkspace
 
 
 class CurrencyList(ListCreateAPIView):
     queryset = Currency.objects.all().order_by("created_at")
+    filter_backends = (FilterByWorkspace,)
     serializer_class = CurrencySerializer
 
 
 class CurrencyDetails(RetrieveUpdateDestroyAPIView):
     queryset = Currency.objects.all()
+    filter_backends = (FilterByWorkspace,)
     serializer_class = CurrencySerializer
     lookup_field = "uuid"
 

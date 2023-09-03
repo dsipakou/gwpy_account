@@ -25,7 +25,7 @@ class RateSerializer(serializers.ModelSerializer):
 
 
 class BatchedRateItemSerializer(serializers.Serializer):
-    code = serializers.CharField()
+    currency = serializers.CharField()
     rate = serializers.CharField()
 
 

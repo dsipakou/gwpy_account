@@ -11,43 +11,50 @@ from rates.utils import generate_date_seq
 from rest_framework.generics import (CreateAPIView, GenericAPIView,
                                      ListAPIView, ListCreateAPIView,
                                      RetrieveUpdateDestroyAPIView)
-from rest_framework.permissions import IsAuthenticated
 from rest_framework.response import Response
 from rest_framework.status import HTTP_400_BAD_REQUEST
+from users.filters import FilterByUser
+from workspaces.filters import FilterByWorkspace
 
 
 class RateList(ListCreateAPIView):
+    queryset = Rate.objects.all()
     pagination_class = None
+    filter_backends = (FilterByWorkspace,)
+
     serializer_class = RateSerializer
-    permission_classes = (IsAuthenticated,)
 
     def get_queryset(self):
+        qs = self.filter_queryset(self.queryset)
         limit = int(self.request.GET.get("limit", 60))
-        grouped_queryset = Rate.objects.annotate(
+        grouped_queryset = qs.annotate(
             seq_number=Window(
                 expression=RowNumber(),
                 partition_by=F("currency"),
                 order_by=F("rate_date").desc(),
             )
         )
-        sql, params = grouped_queryset.query.sql_with_params()
-        self.queryset = Rate.objects.raw(
-            """
-            SELECT *
-            FROM ({}) as seq_table
-            WHERE seq_table.seq_number <= %s
-        """.format(
-                sql
-            ),
-            [*params, limit],
-        )
-        return super().get_queryset()
+        queryset = grouped_queryset.filter(seq_number__lte=limit)
+        # TODO: Remove this if OK
+        # sql, params = grouped_queryset.query.sql_with_params()
+        # breakpoint()
+        # queryset = Rate.objects.raw(
+        #     """
+        #     SELECT *
+        #     FROM ({}) as seq_table
+        #     WHERE seq_table.seq_number <= %s
+        # """.format(
+        #         sql
+        #     ),
+        #     [*params, limit],
+        # )
+        return queryset
 
 
 class CreateBatchedRate(CreateAPIView):
     serializer_class = CreateBatchedRateSerializer
 
-    def create(self, request, *args, **kwards):
+    def create(self, request, *args, **kwargs):
         serializer = self.get_serializer(data=request.data)
         serializer.is_valid(raise_exception=True)
         RateService.create_batched_rates(serializer.data)
@@ -56,18 +63,20 @@ class CreateBatchedRate(CreateAPIView):
 
 class RateDayData(ListAPIView):
     queryset = Rate.objects.all()
+    filter_backends = (DateFilter, FilterByWorkspace)
     serializer_class = RateSerializer
-    filter_backends = (DateFilter,)
 
 
 class RateDetails(RetrieveUpdateDestroyAPIView):
     queryset = Rate.objects.all()
+    filter_backends = (FilterByWorkspace,)
     serializer_class = RateSerializer
     lookup_field = "uuid"
 
 
 class RateChartData(ListAPIView):
-    queryset = Rate.objects.all()
+    queryset = Currency.objects.all()
+    filter_backends = (FilterByWorkspace,)
     serializer_class = RateChartSerializer
 
     def list(self, request, *args, **kwargs):
@@ -90,14 +99,16 @@ class RateChartData(ListAPIView):
         """
 
         range = int(request.GET.get("range", 30))
-        currency_uuids = Currency.objects.filter(is_base=False).values_list(
-            "uuid", flat=True
+        currency_uuids = (
+            self.filter_queryset(self.get_queryset())
+            .filter(is_base=False)
+            .values_list("uuid", flat=True)
         )
         requested_dates = generate_date_seq(range)
         rates = []
         for uuid in currency_uuids:
             rate_values = (
-                self.get_queryset()
+                self.filter_queryset(Rate.objects.all())
                 .filter(currency__uuid=uuid, rate_date__in=requested_dates)
                 .values("rate_date", "rate")
             )
@@ -125,6 +136,9 @@ class RateChartData(ListAPIView):
 
 
 class AvailableRates(GenericAPIView):
+    queryset = Rate.objects.all()
+    filter_backends = (FilterByWorkspace,)
+
     def get(self, request, *args, **kwargs):
         date = request.GET.get("date")
         if not date:
@@ -133,8 +147,12 @@ class AvailableRates(GenericAPIView):
                 exception=True,
                 data={"details": "date_not_found"},
             )
-        currencies = Currency.objects.all()
-        rates_qs = Rate.objects.filter(rate_date=date).values("currency_id", "rate")
+        currencies = self.filter_queryset(Currency.objects.all())
+        rates_qs = (
+            self.filter_queryset(self.get_queryset())
+            .filter(rate_date=date)
+            .values("currency_id", "rate")
+        )
         rates = {rate["currency_id"]: rate["rate"] for rate in rates_qs}
         first_rate = Rate.objects.filter(rate_date=date).first()
         available_rates = {}

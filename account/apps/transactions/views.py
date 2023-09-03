@@ -1,6 +1,7 @@
 from datetime import date, datetime, timedelta
 
 from categories import constants
+from categories.models import Category
 from django.db.models.query import QuerySet
 from rest_framework import status
 from rest_framework.generics import (ListAPIView, ListCreateAPIView,
@@ -15,10 +16,14 @@ from transactions.serializers import (GroupedTransactionSerializer,
                                       TransactionDetailsSerializer,
                                       TransactionSerializer)
 from transactions.services import ReportService, TransactionService
+from users.filters import FilterByUser
+from workspaces.filters import FilterByWorkspace
 
 
 class TransactionList(ListCreateAPIView):
+    queryset = Transaction.objects.all()
     serializer_class = TransactionSerializer
+    filter_backends = (FilterByUser, FilterByWorkspace)
 
     def list(self, request, *args, **kwargs):
         data = {}
@@ -28,6 +33,8 @@ class TransactionList(ListCreateAPIView):
                 data["limit"] = int(limit)
             except:
                 pass
+
+        queryset = self.filter_queryset(self.get_queryset())
 
         if date_from := request.GET.get("dateFrom"):
             data["date_from"] = date_from
@@ -43,7 +50,7 @@ class TransactionList(ListCreateAPIView):
 
         data["order_by"] = "transaction_date"
 
-        transactions = TransactionService.load_transactions(**data)
+        transactions = TransactionService.load_transactions(queryset, **data)
 
         serializer = self.get_serializer(transactions, many=True)
         return Response(serializer.data)
@@ -63,6 +70,7 @@ class TransactionList(ListCreateAPIView):
 
 
 class BudgetTransactions(ListAPIView):
+    filter_backends = (FilterByUser, FilterByWorkspace)
     serializer_class = TransactionSerializer
 
     def get_queryset(self) -> QuerySet:
@@ -81,7 +89,9 @@ class BudgetTransactions(ListAPIView):
         )
 
     def list(self, request, *args, **kwargs):
-        transactions = TransactionService.proceed_transactions(self.get_queryset())
+        transactions = TransactionService.proceed_transactions(
+            self.filter_queryset(self.get_queryset())
+        )
         serializer = self.get_serializer(transactions, many=True)
         return Response(serializer.data)
 
@@ -89,6 +99,7 @@ class BudgetTransactions(ListAPIView):
 class TransactionDetails(RetrieveUpdateDestroyAPIView):
     queryset = Transaction.objects.all()
     serializer_class = TransactionDetailsSerializer
+    filter_backends = (FilterByUser, FilterByWorkspace)
     lookup_field = "uuid"
 
     def update(self, request, *args, **kwargs):
@@ -101,13 +112,15 @@ class TransactionDetails(RetrieveUpdateDestroyAPIView):
 
 
 class TransactionGroupedList(ListAPIView):
+    filter_backends = (FilterByUser, FilterByWorkspace)
     serializer_class = GroupedTransactionSerializer
 
     def list(self, request, *args, **kwargs):
+        qs = self.filter_queryset(self.get_queryset())
         date_from = request.GET.get("dateFrom", date.today() - timedelta(days=30))
         date_to = request.GET.get("dateTo", date.today())
         transactions = TransactionService.load_grouped_transactions(
-            date_from=date_from, date_to=date_to
+            qs, date_from=date_from, date_to=date_to
         )
 
         serializer = self.get_serializer(transactions, many=True)
@@ -115,6 +128,7 @@ class TransactionGroupedList(ListAPIView):
 
 
 class TransactionReportList(ListAPIView):
+    filter_backends = (FilterByUser, FilterByWorkspace)
     serializer_class = ReportByMonthSerializer
 
     def list(self, request, *args, **kwargs):
@@ -127,21 +141,26 @@ class TransactionReportList(ListAPIView):
 
 
 class TransactionReportMonthly(ListAPIView):
+    queryset = Transaction.objects.all()
+    filter_backends = (FilterByWorkspace,)
     serializer_class = ReportChartSerializer
 
     def list(self, request, *args, **kwargs):
+        qs = self.filter_queryset(self.get_queryset())
+        categories_qs = self.filter_queryset(Category.objects.all())
         date_to = datetime.strptime(request.GET["dateTo"], "%Y-%m-%d")
         date_from = datetime.strptime(request.GET["dateFrom"], "%Y-%m-%d")
         currency_code = request.GET.get("currency")
         number_of_days = request.GET.get("numberOfDays")
         data = ReportService.get_chart_report(
-            date_from, date_to, currency_code, number_of_days
+            qs, categories_qs, date_from, date_to, currency_code, number_of_days
         )
         serializer = self.get_serializer(data, many=True)
         return Response(serializer.data)
 
 
 class TransactionIncomeList(ListAPIView):
+    filter_backends = (FilterByUser, FilterByWorkspace)
     serializer_class = IncomeSerializer
 
     def list(self, request, *args, **kwargs):

@@ -9,7 +9,7 @@ def generate_transaction_pricing(apps, schema_editor):
     qs = Transaction.objects.all()
     TransactionAmount = apps.get_model("transactions", "TransactionAmount")
     counter = 1
-    for transaction in qs:
+    for transaction in []:
         rates_on_date = Rate.objects.filter(
             rate_date=transaction.transaction_date
         ).prefetch_related("currency")
@@ -47,6 +47,7 @@ class Migration(migrations.Migration):
 
     dependencies = [
         ("transactions", "0002_transactionamount"),
+        ("workspaces", "0001_initial"),
     ]
 
     operations = [

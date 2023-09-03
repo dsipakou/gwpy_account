@@ -80,4 +80,7 @@ class RegisterSerializer(serializers.ModelSerializer):
         user.active_workspace = workspace
         user.save()
 
+        workspace.members.add(user)
+        workspace.save()
+
         return user

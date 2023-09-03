@@ -4,6 +4,8 @@ from budget import serializers
 from budget.models import Budget
 from budget.serializers import DuplicateResponseSerializer
 from budget.services import BudgetService
+from categories.models import Category
+from currencies.models import Currency
 from rest_framework import status
 from rest_framework.authentication import TokenAuthentication
 from rest_framework.exceptions import ValidationError
@@ -13,11 +15,12 @@ from rest_framework.generics import (GenericAPIView, ListAPIView,
 from rest_framework.response import Response
 from users.filters import FilterByUser
 from users.permissions import BaseUserPermission
+from workspaces.filters import FilterByWorkspace
 
 
 class BudgetList(ListCreateAPIView):
     queryset = Budget.objects.select_related("category").all()
-    filter_backends = (FilterByUser,)
+    filter_backends = (FilterByUser, FilterByWorkspace)
     serializer_class = serializers.BudgetSerializer
 
     def create(self, request, *args, **kwargs):
@@ -59,32 +62,9 @@ class BudgetDetails(RetrieveUpdateDestroyAPIView):
         BudgetService.create_budget_multicurrency_amount([instance.uuid])
 
 
-class PlannedBudgetList(ListAPIView):
-    authentication_classes = (TokenAuthentication,)
+class MonthlyUsageBudgetList(ListAPIView):
     queryset = Budget.objects.all()
-    filter_backends = (FilterByUser,)
-    serializer_class = serializers.PlannedBudgetSerializer
-
-    def list(self, request, *args, **kwargs):
-        dateFrom = request.GET.get(
-            "dateFrom", datetime.date.today() - datetime.timedelta(days=30)
-        )
-        dateTo = request.GET.get("dateTo", datetime.date.today())
-        queryset = (
-            self.get_queryset()
-            .select_related("user")
-            .select_related("category")
-            .select_related("currency")
-            .filter(budget_date__lte=dateTo, budget_date__gte=dateFrom)
-        )
-
-        serializer = self.get_serializer(queryset, many=True)
-        return Response(serializer.data)
-
-
-class ActualUsageBudgetList(ListAPIView):
-    queryset = Budget.objects.all()
-    filter_backends = (FilterByUser,)
+    filter_backends = (FilterByUser, FilterByWorkspace)
     serializer_class = serializers.CategoryBudgetSerializer
 
     def list(self, request, *args, **kwargs):
@@ -95,7 +75,12 @@ class ActualUsageBudgetList(ListAPIView):
         user = request.GET.get("user")
 
         categories = BudgetService.load_budget(
-            self.get_queryset(), date_from, date_to, user
+            self.filter_queryset(self.get_queryset()),
+            self.filter_queryset(Category.objects.all()),
+            Currency.objects.filter(workspace=request.user.active_workspace),
+            date_from,
+            date_to,
+            user,
         )
 
         serializer = self.get_serializer(categories, many=True)
@@ -104,11 +89,10 @@ class ActualUsageBudgetList(ListAPIView):
 
 class WeeklyUsageList(ListAPIView):
     queryset = Budget.objects.all()
-    filter_backends = (FilterByUser,)
+    filter_backends = (FilterByUser, FilterByWorkspace)
     serializer_class = serializers.BudgetUsageSerializer
 
     def list(self, request, *args, **kwargs):
-        start = datetime.datetime.now()
         date_from = request.GET.get(
             "dateFrom", datetime.date.today() - datetime.timedelta(days=30)
         )
@@ -116,33 +100,21 @@ class WeeklyUsageList(ListAPIView):
         user = request.GET.get("user")
 
         budgets = BudgetService.load_weekly_budget(
-            self.get_queryset(), date_from, date_to, user
+            self.filter_queryset(self.get_queryset()),
+            Currency.objects.filter(workspace=request.user.active_workspace),
+            date_from,
+            date_to,
+            request.user.active_workspace,
+            user,
         )
 
         serializer = self.get_serializer(budgets, many=True)
         return Response(serializer.data)
 
 
-class ArchiveView(ListAPIView):
-    queryset = Budget.objects.all()
-    filter_backends = (FilterByUser,)
-    serializer_class = serializers.ArchiveSerializer
-
-    def list(self, request, *args, **kwargs):
-        current_date = request.GET.get("date")
-        category_uuid = request.GET.get("category")
-
-        archive = BudgetService.get_archive(
-            self.get_queryset(), current_date, category_uuid
-        )
-
-        serializer = self.get_serializer(archive, many=True)
-        return Response(serializer.data)
-
-
 class DuplicateBudgetView(GenericAPIView):
     queryset = Budget.objects.all()
-    filter_backends = (FilterByUser,)
+    filter_backends = (FilterByUser, FilterByWorkspace)
     serializer_class = serializers.DuplicateRequestSerializer
     permission_classes = (BaseUserPermission,)
 

@@ -9,7 +9,7 @@ class Workspace(models.Model):
     uuid = models.UUIDField(unique=True, default=uuid.uuid4, editable=False)
     name = models.CharField(_("name"), max_length=255)
     owner = models.ForeignKey(
-        User, related_name="owned_workspace", on_delete=models.CASCADE
+        User, related_name="workspace_owner", on_delete=models.CASCADE
     )
     members = models.ManyToManyField(
         User, related_name="workspaces", null=True, blank=True

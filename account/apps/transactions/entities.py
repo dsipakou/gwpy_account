@@ -13,6 +13,10 @@ class TransactionAccountDetails(TypedDict):
     source: str
 
 
+class TransactionCurrencyDetails(TypedDict):
+    sign: str
+
+
 class TransactionSpentInCurrencyDetails(TypedDict):
     amount: float
     sign: str
@@ -30,6 +34,7 @@ class TransactionItem(TypedDict):
     category_details: TransactionCategoryDetails
     budget: UUID
     currency: UUID
+    currency_details: TransactionCurrencyDetails
     amount: float
     spent_in_base_currency: float
     spent_in_currencies: Dict[str, float]

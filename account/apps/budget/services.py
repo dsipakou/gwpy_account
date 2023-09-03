@@ -14,11 +14,12 @@ from categories import constants
 from categories.models import Category
 from currencies.models import Currency
 from dateutil.relativedelta import relativedelta
-from django.db.models import Count, Prefetch, Q, Sum
+from django.db.models import Count, Prefetch, Q, QuerySet, Sum
 from django.db.models.functions import TruncMonth
 from rates.models import Rate
 from rates.utils import generate_amount_map
 from transactions.models import Rate, Transaction
+from workspaces.models import Workspace
 
 RECURRENT_TYPE_MAPPING = {
     BudgetDuplicateType.MONTHLY: {
@@ -49,33 +50,6 @@ class BudgetService:
                 budget=budget, defaults={"amount_map": amount_map}
             )
 
-    @classmethod
-    def get_archive(
-        cls, qs, current_date: datetime.date, category_uuid: str
-    ) -> List[MonthUsageSum]:
-        archive = []
-        start_date = datetime.date.fromisoformat(current_date).replace(
-            day=1
-        ) - relativedelta(months=6)
-        end_date = start_date + relativedelta(months=6)
-
-        archive_sum = (
-            qs.annotate(month=TruncMonth("budget_date"))
-            .filter(
-                budget_date__gte=start_date,
-                budget_date__lt=end_date,
-                category=category_uuid,
-            )
-            .values("month")
-            .annotate(planned=Sum("amount"))
-            .order_by("month")
-        )
-
-        for item in archive_sum:
-            archive.append(MonthUsageSum(month=item["month"], planned=item["planned"]))
-
-        return archive
-
     @staticmethod
     def _get_latest_rates():
         latest_rates = {}
@@ -88,7 +62,9 @@ class BudgetService:
     @classmethod
     def load_budget(
         cls,
-        queryset,
+        queryset: QuerySet,
+        categories_qs: QuerySet,
+        currency_qs: QuerySet,
         date_from: datetime.date,
         date_to: datetime.date,
         user: Optional[str],
@@ -99,7 +75,7 @@ class BudgetService:
             "transaction_set",
             queryset=Transaction.objects.select_related(
                 "currency", "multicurrency"
-            ).all(),
+            ).filter(budget__in=queryset),
             to_attr="transactions",
         )
         budgets = (
@@ -118,7 +94,7 @@ class BudgetService:
             to_attr="budgets",
         )
         categories = (
-            Category.objects.filter(parent__isnull=True, type=constants.EXPENSE)
+            categories_qs.filter(parent__isnull=True, type=constants.EXPENSE)
             .prefetch_related(category_budgets_prefetch)
             .annotate(
                 budget_count=Count(
@@ -134,18 +110,26 @@ class BudgetService:
 
         category_list = list(categories)
 
-        return cls.make_categories(category_list, cls._get_latest_rates())
+        return cls.make_categories(currency_qs, category_list, cls._get_latest_rates())
 
     @classmethod
     def load_weekly_budget(
-        cls, qs, date_from, date_to, user: Optional[str]
+        cls,
+        qs: QuerySet,
+        currency_qs: QuerySet,
+        date_from,
+        date_to,
+        workspace: Workspace,
+        user: Optional[str],
     ) -> List[BudgetItem]:
         budgets = (
             qs.filter(budget_date__lte=date_to, budget_date__gte=date_from)
             .prefetch_related(
                 Prefetch(
                     "transaction_set",
-                    queryset=Transaction.objects.select_related("multicurrency").all(),
+                    queryset=Transaction.objects.select_related("multicurrency").filter(
+                        budget__in=qs
+                    ),
                     to_attr="transactions",
                 ),
             )
@@ -155,7 +139,7 @@ class BudgetService:
         if user:
             budgets = budgets.filter(user__uuid=user)
 
-        available_currencies = Currency.objects.values("code", "is_base")
+        available_currencies = currency_qs.values("code", "is_base")
         base_currency = available_currencies.get(is_base=True)["code"]
 
         return cls.make_budgets(
@@ -166,10 +150,12 @@ class BudgetService:
         )
 
     @classmethod
-    def make_categories(cls, categories, latest_rates) -> List[CategoryItem]:
+    def make_categories(
+        cls, currency_qs: QuerySet, categories, latest_rates
+    ) -> List[CategoryItem]:
         categories_list = []
         eval_categories = [category for category in categories]
-        available_currencies = Currency.objects.values("code", "is_base")
+        available_currencies = currency_qs.values("code", "is_base")
         base_currency = available_currencies.get(is_base=True)["code"]
         for category in eval_categories:
             budgets = cls.make_grouped_budgets(
@@ -273,7 +259,11 @@ class BudgetService:
     ) -> List[BudgetItem]:
         budgets_list = []
         for budget in budgets:
-            multicurrency_map = budget.multicurrency.amount_map
+            multicurrency_map = (
+                budget.multicurrency.amount_map
+                if hasattr(budget, "multicurrency")
+                else {}
+            )
             planned_in_base_currency = multicurrency_map.get(
                 base_currency, budget.amount
             )
@@ -287,7 +277,7 @@ class BudgetService:
             logger.debug("budget.services.make_budgets.currencies.start")
             for currency in available_currencies:
                 if (
-                    budget.multicurrency
+                    hasattr(budget, "multicurrency")
                     and currency["code"] in budget.multicurrency.amount_map
                 ):
                     planned_in_currencies[
@@ -351,7 +341,11 @@ class BudgetService:
     ) -> List[dict]:
         transactions_list = []
         for transaction in transactions:
-            multicurrency_map = transaction.multicurrency.amount_map
+            multicurrency_map = (
+                transaction.multicurrency.amount_map
+                if hasattr(transaction, "multicurrency")
+                else {}
+            )
             spent_in_base_currency = multicurrency_map[base_currency_code]
             for currency_code in latest_rates:
                 if currency_code not in multicurrency_map:
@@ -432,6 +426,7 @@ class BudgetService:
                     budget_date=upcoming_item_date,
                     description=budget_item.description,
                     recurrent=budget_item.recurrent,
+                    workspace=budget_item.workspace,
                 )
 
                 cls.create_budget_multicurrency_amount([budget.uuid])

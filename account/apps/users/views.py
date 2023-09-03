@@ -7,17 +7,21 @@ from rest_framework.authtoken.views import ObtainAuthToken
 from rest_framework.generics import CreateAPIView, ListAPIView, UpdateAPIView
 from rest_framework.permissions import AllowAny, IsAuthenticated
 from rest_framework.response import Response
+from users.filters import FilterByUser
 from users.models import User
 from users.serializers import (ChangeDefaultCurrencySerializer,
                                RegisterSerializer, UserLoginSerializer,
                                UserSerializer)
+from workspaces.filters import FilterByWorkspace
 
 
 class UserList(ListAPIView):
     serializer_class = UserSerializer
 
-    def get_queryset(self):
-        return self.request.user.active_workspace.members
+    def list(self, request, *args, **kwargs):
+        members = request.user.active_workspace.members
+        serializer = self.get_serializer(members, many=True)
+        return Response(serializer.data)
 
 
 class UserAuth(ObtainAuthToken):
@@ -55,15 +59,20 @@ class RegisterView(CreateAPIView):
 
 
 class CurrencyView(UpdateAPIView):
+    queryset = Currency.objects.all()
     authentication_classes = (TokenAuthentication,)
     permission_classes = (IsAuthenticated,)
     serializer_class = ChangeDefaultCurrencySerializer
+    filter_backends = (FilterByUser, FilterByWorkspace)
+    lookup_field = "code"
 
     def update(self, request, *args, **kwargs):
         serializer = self.get_serializer(data=request.data)
         serializer.is_valid(raise_exception=True)
         user = request.user
         currency_code = serializer.validated_data["currency"]
-        user.default_currency = Currency.objects.get(code=currency_code)
+        user.default_currency = self.filter_queryset(self.get_queryset()).get(
+            code=currency_code
+        )
         user.save(force_update=True, update_fields=("default_currency",))
         return Response(status=status.HTTP_200_OK)

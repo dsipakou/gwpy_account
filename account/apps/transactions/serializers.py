@@ -17,6 +17,10 @@ class TransactionBudgetSerializer(serializers.Serializer):
     title = serializers.CharField()
 
 
+class TransactionCurrencySerializer(serializers.Serializer):
+    sign = serializers.CharField()
+
+
 class TransactionSpentInCurrencySerializer(serializers.Serializer):
     amount = serializers.FloatField()
     sign = serializers.CharField()
@@ -31,6 +35,7 @@ class TransactionSerializer(serializers.Serializer):
     budget = serializers.UUIDField(allow_null=True)
     budget_details = TransactionBudgetSerializer(read_only=True, allow_null=True)
     currency = serializers.UUIDField()
+    currency_details = TransactionCurrencySerializer(read_only=True, allow_null=True)
     amount = serializers.FloatField()
     spent_in_currencies = serializers.DictField(read_only=True)
     account = serializers.UUIDField()

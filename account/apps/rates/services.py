@@ -12,16 +12,14 @@ class RateService:
     @classmethod
     def create_batched_rates(cls, data: BatchedRateRequest):
         user = User.objects.get(uuid=data["user"])
-        currencies_qs = Currency.objects.values("code", "uuid")
-        currencies = {item["code"]: str(item["uuid"]) for item in currencies_qs}
         for item in data["items"]:
             Rate.objects.update_or_create(
-                currency_id=currencies[item["code"]],
+                currency_id=item["currency"],
                 rate_date=data["rate_date"],
                 workspace=user.active_workspace,
                 defaults={
                     "rate": item["rate"],
-                    "base_currency_id": currencies[data["base_currency"]],
+                    "base_currency_id": data["base_currency"],
                 },
             )
         budget_uuids = Budget.objects.filter(budget_date=data["rate_date"]).values_list(

@@ -5,7 +5,7 @@ from django.db import models
 
 class Currency(models.Model):
     uuid = models.UUIDField(unique=True, default=uuid.uuid4, editable=False)
-    code = models.CharField(max_length=5, unique=True)
+    code = models.CharField(max_length=5)
     sign = models.CharField(max_length=2)
     verbal_name = models.CharField(max_length=30)
     comments = models.CharField(max_length=255, blank=True)
@@ -19,3 +19,6 @@ class Currency(models.Model):
 
     def __str__(self):
         return self.code
+
+    class Meta:
+        unique_together = ["code", "workspace"]

@@ -8,7 +8,7 @@ from rates.models import Rate
 def generate_budget_pricing(apps, schema_editor):
     qs = Budget.objects.all()
     BudgetAmount = apps.get_model("transactions", "TransactionAmount")
-    for budget in qs:
+    for budget in []:
         rates_on_date = Rate.objects.filter(
             rate_date=budget.budget_date
         ).prefetch_related("currency")
@@ -41,6 +41,8 @@ def generate_budget_pricing(apps, schema_editor):
 class Migration(migrations.Migration):
     dependencies = [
         ("budget", "0010_budgetamount"),
+        ("transactions", "0002_transactionamount"),
+        ("workspaces", "0001_initial"),
     ]
 
     operations = [

@@ -5,14 +5,14 @@ from rest_framework.exceptions import ValidationError
 from rest_framework.generics import (ListCreateAPIView,
                                      RetrieveUpdateDestroyAPIView)
 from transactions.models import Transaction
-from users.filters import FilterByUser
-from users.permissions import BaseUserPermission
+from workspaces.filters import FilterByWorkspace
+from workspaces.permissions import BaseWorkspacePermission
 
 
 class CategoryList(ListCreateAPIView):
     queryset = Category.objects.all().select_related("parent").order_by("name")
     serializer_class = CategorySerializer
-    filter_backends = (FilterByUser,)
+    filter_backends = (FilterByWorkspace,)
 
     def perform_create(self, serializer):
         """Check if parent category is not a child of any other category
@@ -32,7 +32,7 @@ class CategoryList(ListCreateAPIView):
 class CategoryDetails(RetrieveUpdateDestroyAPIView):
     queryset = Category.objects.all()
     serializer_class = CategorySerializer
-    permission_classes = (BaseUserPermission,)
+    permission_classes = (BaseWorkspacePermission,)
     lookup_field = "uuid"
 
     def perform_update(self, serializer):

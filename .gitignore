@@ -162,3 +162,12 @@ cython_debug/
 .DS_Store
 .vscode
 pyrightconfig.json
+
+# fly
+fly.conf
+fly.toml
+
+# Docker
+.dockerignore
+Dockerfile.backup
+Dockerfile.fly

@@ -25,4 +25,4 @@ class Rate(models.Model):
     )
 
     class Meta:
-        unique_together = ["currency", "rate_date"]
+        unique_together = ["currency", "rate_date", "workspace"]

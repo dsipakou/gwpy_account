@@ -11,7 +11,8 @@ from rates.utils import generate_amount_map
 from transactions.entities import (GroupedByCategory, GroupedByMonth,
                                    GroupedByParent, TransactionAccountDetails,
                                    TransactionBudgetDetails,
-                                   TransactionCategoryDetails, TransactionItem,
+                                   TransactionCategoryDetails,
+                                   TransactionCurrencyDetails, TransactionItem,
                                    TransactionSpentInCurrencyDetails)
 from transactions.models import Transaction, TransactionMulticurrency
 
@@ -48,8 +49,13 @@ class TransactionService:
         account_details = TransactionAccountDetails(
             title=transaction.account.title,
         )
-        spent_details = TransactionSpentInCurrencyDetails(
-            transaction.multicurrency.amount_map
+        currency_details = TransactionCurrencyDetails(
+            sign=transaction.currency.sign,
+        )
+        spent_details = (
+            TransactionSpentInCurrencyDetails(transaction.multicurrency.amount_map)
+            if hasattr(transaction, "multicurrency")
+            else None
         )
 
         budget_details = None
@@ -66,6 +72,7 @@ class TransactionService:
             budget=transaction.budget.uuid if transaction.budget else None,
             budget_details=budget_details,
             currency=transaction.currency.uuid,
+            currency_details=currency_details,
             amount=transaction.amount,
             spent_in_currencies=spent_details,
             account=transaction.account.uuid,
@@ -173,6 +180,7 @@ class TransactionService:
     @classmethod
     def load_transactions(
         cls,
+        queryset: QuerySet,
         *,
         limit: int = 15,
         order_by: str = "created_at",
@@ -182,9 +190,7 @@ class TransactionService:
         date_from: Optional[str] = None,
         date_to: Optional[str] = None,
     ) -> List[TransactionItem]:
-        qs = Transaction.objects.filter(category__type=category_type).select_related(
-            "category"
-        )
+        qs = queryset.filter(category__type=category_type).select_related("category")
 
         if date_from and date_to:
             qs = qs.filter(
@@ -210,9 +216,9 @@ class TransactionService:
 
     @classmethod
     def load_grouped_transactions(
-        cls, *, date_from: Optional[str] = None, date_to: Optional[str] = None
+        cls, queryset, *, date_from: Optional[str] = None, date_to: Optional[str] = None
     ) -> List[GroupedByParent]:
-        qs = Transaction.objects.all().order_by("-created_at")
+        qs = queryset.order_by("-created_at")
         if date_from:
             qs = qs.filter(transaction_date__gte=date_from)
         if date_to:
@@ -235,13 +241,15 @@ class ReportService:
     @classmethod
     def get_chart_report(
         cls,
+        qs: QuerySet,
+        categories_qs: QuerySet,
         date_from: str,
         date_to: str,
         currency_code: str,
         till_day: Optional[int] = None,
     ):
         grouped_transactions = Transaction.grouped_by_month_and_category(
-            date_from, date_to, currency_code, till_day
+            qs, date_from, date_to, currency_code, till_day
         )
 
         grouped_map = cls._get_grouped_map(grouped_transactions)
@@ -256,12 +264,13 @@ class ReportService:
             start_date = start_date.replace(day=1)
 
         categories_list = (
-            Category.objects.values_list("name", flat=True)
+            categories_qs.values_list("name", flat=True)
             .filter(parent__isnull=True, type=category_constants.EXPENSE)
             .order_by("name")
         )
 
         output = []
+
         for date_item in month_year_list:
             current_item = {}
             current_item["date"] = date_item

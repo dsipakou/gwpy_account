@@ -18,18 +18,36 @@ class CurrencySerializer(serializers.ModelSerializer):
         )
 
     def validate_is_base(self, value):
+        user = self.context["request"].user
         if value:
-            Currency.objects.filter(is_base=True).update(is_base=False)
+            Currency.objects.filter(
+                is_base=True, workspace=user.active_workspace
+            ).update(is_base=False)
         return value
 
     def validate_is_default(self, value):
+        user = self.context["request"].user
         if value:
-            Currency.objects.filter(is_default=True).update(is_default=False)
+            Currency.objects.filter(
+                is_default=True, workspace=user.active_workspace
+            ).update(is_default=False)
         return value
 
     def create(self, validated_data):
         user = self.context["request"].user
-        return Currency.objects.create(
+        is_base_currency_exists = Currency.objects.filter(
+            is_base=True, workspace=user.active_workspace
+        ).exists()
+        if not is_base_currency_exists:
+            validated_data["is_base"] = True
+
+        currency = Currency.objects.create(
             workspace=user.active_workspace,
             **validated_data,
         )
+
+        if validated_data.get("is_base"):
+            user.default_currency = currency
+            user.save(force_update=True, update_fields=("default_currency",))
+
+        return currency

@@ -12,8 +12,11 @@ class Budget(models.Model):
 
     uuid = models.UUIDField(unique=True, default=uuid.uuid4, editable=False)
     user = models.ForeignKey("users.User", on_delete=models.DO_NOTHING, to_field="uuid")
+    workspace = models.ForeignKey(
+        "workspaces.Workspace", to_field="uuid", on_delete=models.DO_NOTHING
+    )
     category = models.ForeignKey(
-        "categories.Category", on_delete=models.CASCADE, to_field="uuid", null=True
+        "categories.Category", on_delete=models.CASCADE, to_field="uuid"
     )
     currency = models.ForeignKey(
         "currencies.Currency", on_delete=models.DO_NOTHING, to_field="uuid"

@@ -7,6 +7,7 @@ from categories import constants as category_constants
 from currencies.models import Currency
 from django.contrib.postgres.aggregates import StringAgg
 from django.db import connection, models
+from django.db.models import QuerySet
 from django.db.models.fields.json import KeyTextTransform
 from django.db.models.functions import Cast, Trunc
 from django.db.models.functions.datetime import TruncMonth
@@ -27,8 +28,6 @@ class Transaction(models.Model):
     workspace = models.ForeignKey(
         "workspaces.Workspace",
         to_field="uuid",
-        null=True,
-        blank=True,
         on_delete=models.DO_NOTHING,
     )
     amount = models.FloatField()
@@ -102,12 +101,15 @@ class Transaction(models.Model):
 
     @classmethod
     def grouped_by_month_and_category(
-        cls, date_from: str, date_to: str, currency_code: str, till_day: Optional[int]
+        cls,
+        qs: QuerySet,
+        date_from: str,
+        date_to: str,
+        currency_code: str,
+        till_day: Optional[int],
     ):
-        qs = (
-            Transaction.objects.select_related(
-                "category", "category__parent", "multicurrency"
-            )
+        filtered_qs = (
+            qs.select_related("category", "category__parent", "multicurrency")
             .values("category__parent", "category__parent__name")
             .annotate(
                 parent_sum=models.Sum(
@@ -127,13 +129,13 @@ class Transaction(models.Model):
         )
 
         if till_day is not None:
-            qs = qs.filter(
+            filtered_qs = filtered_qs.filter(
                 transaction_date__lte=TruncMonth("transaction_date")
                 + models.Value(datetime.timedelta(days=int(till_day)))
                 - models.Value(datetime.timedelta(seconds=1))
             )
 
-        return qs.order_by("year_month", "category__parent__name")
+        return filtered_qs
 
     @classmethod
     def income_grouped_by_income(cls, date_from: str, date_to: str):

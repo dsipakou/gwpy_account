@@ -1,6 +1,6 @@
 from rest_framework import serializers
 from rest_framework.exceptions import ValidationError
-from transactions.models import Transaction
+from transactions.models import LastViewed, Transaction
 
 
 class TransactionCategorySerializer(serializers.Serializer):
@@ -130,4 +130,13 @@ class IncomeSerializer(serializers.ModelSerializer):
             "transaction_date",
             "amount",
             "currency",
+        )
+
+
+class LastViewedSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = LastViewed
+        fields = (
+            "user",
+            "transaction",
         )

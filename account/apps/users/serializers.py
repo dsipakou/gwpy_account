@@ -1,7 +1,7 @@
 from django.contrib.auth.password_validation import validate_password
 from rest_framework import serializers
 from rest_framework.validators import UniqueValidator
-from users.models import User
+from users.models import Invite, User
 from workspaces.models import Workspace
 
 
@@ -30,6 +30,17 @@ class UserLoginSerializer(serializers.Serializer):
 
 class ChangeDefaultCurrencySerializer(serializers.Serializer):
     currency = serializers.CharField()
+
+
+class InviteSeriazlier(serializers.ModelSerializer):
+    class Meta:
+        model = Invite
+        fields = (
+            "invite_reciever",
+            "invite_owner",
+            "workspace",
+            "is_accepted",
+        )
 
 
 class RegisterSerializer(serializers.ModelSerializer):

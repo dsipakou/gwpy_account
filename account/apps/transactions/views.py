@@ -7,7 +7,7 @@ from rest_framework import status
 from rest_framework.generics import (ListAPIView, ListCreateAPIView,
                                      RetrieveUpdateDestroyAPIView)
 from rest_framework.response import Response
-from transactions.models import Transaction
+from transactions.models import LastViewed, Transaction
 from transactions.serializers import (GroupedTransactionSerializer,
                                       IncomeSerializer,
                                       ReportByMonthSerializer,
@@ -18,6 +18,8 @@ from transactions.serializers import (GroupedTransactionSerializer,
 from transactions.services import ReportService, TransactionService
 from users.filters import FilterByUser
 from workspaces.filters import FilterByWorkspace
+
+from account.apps.transactions.serializers import LastViewedSerializer
 
 
 class TransactionList(ListCreateAPIView):
@@ -174,3 +176,49 @@ class TransactionIncomeList(ListAPIView):
         data = TransactionService.group_by_month(transactions)
         serializer = self.get_serializer(instance=transactions, many=True)
         return Response(serializer.data)
+
+
+class TransactionsLastAddedView(ListCreateAPIView):
+    filter_backends = (FilterByUser, FilterByWorkspace)
+    serializer_class = TransactionSerializer
+
+    def get_queryset(self) -> QuerySet:
+        user = self.request.user
+        try:
+            last_viewed = LastViewed.objects.get(user=user)
+        except LastViewed.DoesNotExist:
+            last_viewed = None
+        qs = (
+            Transaction.objects.select_related(
+                "account",
+                "budget",
+                "category",
+                "category__parent",
+                "currency",
+                "multicurrency",
+                "user",
+            )
+            .exclude(user=user)
+            .order_by("-pk")
+        )
+
+        if last_viewed:
+            qs = qs.filter(created_at__gt=last_viewed.transaction.created_at)
+
+        return qs
+
+    def list(self, request, *args, **kwargs):
+        transactions = TransactionService.proceed_transactions(
+            self.filter_queryset(self.get_queryset())
+        )
+        serializer = self.get_serializer(transactions, many=True)
+        return Response(serializer.data)
+
+    def create(self, request, *args, **kwargs):
+        user = request.data["user"]
+        LastViewed.objects.filter(user=user).delete()
+        serializer = LastViewedSerializer(data=request.data)
+        serializer.is_valid(raise_exception=True)
+        serializer.save()
+
+        return Response(status=status.HTTP_201_CREATED)

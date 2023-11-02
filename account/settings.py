@@ -74,7 +74,7 @@ MIDDLEWARE = [
     "django.middleware.clickjacking.XFrameOptionsMiddleware",
 ]
 
-ALLOWED_HOSTS = ["localhost", "127.0.0.1", "192.168.0.19", "fly-account-api.fly.dev"]
+ALLOWED_HOSTS = ["localhost", "127.0.0.1", "fly-account-api.fly.dev"]
 CSRF_TRUSTED_ORIGINS = ["https://fly-account-api.fly.dev"]
 
 CORS_ALLOW_ALL_ORIGINS = True
@@ -188,6 +188,7 @@ REST_FRAMEWORK = {
         "rest_framework.authentication.TokenAuthentication",
     ),
     "DEFAULT_PERMISSION_CLASSES": ("rest_framework.permissions.IsAuthenticated",),
+    "DEFAULT_PAGINATION_CLASS": "rest_framework.pagination.LimitOffsetPagination",
 }
 
 DEFAULT_AUTO_FIELD = "django.db.models.BigAutoField"

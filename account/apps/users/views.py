@@ -1,17 +1,16 @@
 from currencies.models import Currency
 from django.contrib.auth import authenticate
 from rest_framework import status
-from rest_framework.authentication import TokenAuthentication
 from rest_framework.authtoken.models import Token
 from rest_framework.authtoken.views import ObtainAuthToken
 from rest_framework.generics import CreateAPIView, ListAPIView, UpdateAPIView
 from rest_framework.permissions import AllowAny, IsAuthenticated
 from rest_framework.response import Response
 from users.filters import FilterByUser
-from users.models import User
+from users.models import Invite, User
 from users.serializers import (ChangeDefaultCurrencySerializer,
                                RegisterSerializer, UserLoginSerializer,
-                               UserSerializer)
+                               UserSerializer, InviteSeriazlier)
 from workspaces.filters import FilterByWorkspace
 
 
@@ -60,8 +59,6 @@ class RegisterView(CreateAPIView):
 
 class CurrencyView(UpdateAPIView):
     queryset = Currency.objects.all()
-    authentication_classes = (TokenAuthentication,)
-    permission_classes = (IsAuthenticated,)
     serializer_class = ChangeDefaultCurrencySerializer
     filter_backends = (FilterByUser, FilterByWorkspace)
     lookup_field = "code"
@@ -76,3 +73,22 @@ class CurrencyView(UpdateAPIView):
         )
         user.save(force_update=True, update_fields=("default_currency",))
         return Response(status=status.HTTP_200_OK)
+
+
+class InviteView(CreateAPIView):
+    queryset = Invite.objects.all()
+    serializer_class = InviteSeriazlier
+
+    def create(self, request, *args, **kwargs):
+        data = {}
+        try:
+            data["invite_reciever"] = User.objects.get(email=request.data["email"])
+        except User.DoesNotExist:
+            return Response(status=status.HTTP_400_BAD_REQUEST, data={"message": "This user does not exist"})
+        data["invite_owner"] = request.user
+        data["workspace"] = request.user.active_workspace.uuid
+        serializer = self.get_serializer(data=data)
+        serializer.is_valid(raise_exception=True)
+        self.perform_create(serializer)
+        headers = self.get_success_headers(serializer.data)
+        return Response(serializer.data, status=status.HTTP_201_CREATED, headers=headers)

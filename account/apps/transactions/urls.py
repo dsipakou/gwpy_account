@@ -23,4 +23,9 @@ urlpatterns = [
         views.BudgetTransactions.as_view(),
         name="budget_transactions",
     ),
+    path(
+        "last-added/",
+        views.TransactionsLastAddedView.as_view(),
+        name="transactions_last_added",
+    ),
 ]

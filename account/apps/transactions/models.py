@@ -1,6 +1,7 @@
 import datetime
 import textwrap
 import uuid
+from enum import unique
 from typing import Optional
 
 from categories import constants as category_constants
@@ -13,6 +14,7 @@ from django.db.models.functions import Cast, Trunc
 from django.db.models.functions.datetime import TruncMonth
 from rates.models import Rate
 from transactions.utils import dictfetchall
+from users.models import User
 
 
 class Transaction(models.Model):
@@ -173,3 +175,18 @@ class TransactionMulticurrency(models.Model):
         on_delete=models.CASCADE,
     )
     amount_map = models.JSONField(default=dict)
+
+
+class LastViewed(models.Model):
+    uuid = models.UUIDField(unique=True, default=uuid.uuid4, editable=False)
+    user = models.ForeignKey(
+        User,
+        to_field="uuid",
+        null=True,
+        blank=True,
+        unique=True,
+        on_delete=models.DO_NOTHING,
+    )
+    transaction = models.ForeignKey(
+        Transaction, to_field="uuid", on_delete=models.DO_NOTHING
+    )

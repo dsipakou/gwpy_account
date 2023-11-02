@@ -34,3 +34,20 @@ class User(AbstractUser):
 
     def __str__(self):
         return self.email
+
+
+class Invite(models.Model):
+    uuid = models.UUIDField(unique=True, default=uuid.uuid4, editable=False)
+    invite_reciever = models.ForeignKey(
+        User, to_field="email", on_delete=models.DO_NOTHING, related_name="reciever"
+    )
+    invite_owner = models.ForeignKey(
+        User, to_field="email", on_delete=models.DO_NOTHING, related_name="owner"
+    )
+    workspace = models.ForeignKey(
+        "workspaces.Workspace", to_field="uuid", on_delete=models.DO_NOTHING
+    )
+    is_accepted = models.BooleanField(default=False)
+
+    class Meta:
+        unique_together = ["invite_owner", "invite_reciever", "workspace"]

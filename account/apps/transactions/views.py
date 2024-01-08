@@ -62,8 +62,11 @@ class TransactionList(ListCreateAPIView):
         serializer.is_valid(raise_exception=True)
         instance = serializer.save()
         headers = self.get_success_headers(serializer.data)
+        workspace = request.user.active_workspace
 
-        TransactionService.create_transaction_multicurrency_amount([instance.uuid])
+        TransactionService.create_transaction_multicurrency_amount(
+            [instance.uuid], workspace=workspace
+        )
         transaction = TransactionService.load_transaction(instance.uuid)
         serializer = self.get_serializer(transaction)
         return Response(
@@ -106,10 +109,13 @@ class TransactionDetails(RetrieveUpdateDestroyAPIView):
 
     def update(self, request, *args, **kwargs):
         instance = self.get_object()
+        workspace = request.user.active_workspace
         serializer = self.get_serializer(instance, data=request.data, partial=True)
         serializer.is_valid(raise_exception=True)
         self.perform_update(serializer)
-        TransactionService.create_transaction_multicurrency_amount([instance.uuid])
+        TransactionService.create_transaction_multicurrency_amount(
+            [instance.uuid], workspace=workspace
+        )
         return Response(serializer.data, status=status.HTTP_200_OK)
 
 

@@ -6,6 +6,7 @@ from rates.models import Rate
 from transactions.models import Transaction
 from transactions.services import TransactionService
 from users.models import User
+from workspaces.models import Workspace
 
 
 class RateService:
@@ -22,11 +23,15 @@ class RateService:
                     "base_currency_id": data["base_currency"],
                 },
             )
-        budget_uuids = Budget.objects.filter(budget_date=data["rate_date"]).values_list(
-            "uuid", flat=True
-        )
-        transaction_uuids = Transaction.objects.filter(
-            transaction_date=data["rate_date"]
+        budget_uuids = Budget.objects.filter(
+            budget_date=data["rate_date"], workspace=user.active_workspace
         ).values_list("uuid", flat=True)
-        BudgetService.create_budget_multicurrency_amount(budget_uuids)
-        TransactionService.create_transaction_multicurrency_amount(transaction_uuids)
+        transaction_uuids = Transaction.objects.filter(
+            transaction_date=data["rate_date"], workspace=user.active_workspace
+        ).values_list("uuid", flat=True)
+        BudgetService.create_budget_multicurrency_amount(
+            budget_uuids, workspace=user.active_workspace
+        )
+        TransactionService.create_transaction_multicurrency_amount(
+            transaction_uuids, workspace=user.active_workspace
+        )

@@ -12,7 +12,7 @@ from workspaces.filters import FilterByWorkspace
 
 
 class AccountList(ListCreateAPIView):
-    queryset = Account.objects.order_by("is_main", "created_at")
+    queryset = Account.objects.order_by("-is_main", "created_at")
     serializer_class = AccountSerializer
     permission_classes = (BaseUserPermission,)
     filter_backends = (FilterByUser, FilterByWorkspace)

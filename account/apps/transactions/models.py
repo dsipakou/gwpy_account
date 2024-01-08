@@ -42,6 +42,14 @@ class Transaction(models.Model):
     modified_at = models.DateTimeField(auto_now=True)
 
     @property
+    def multicurrency_map(self):
+        return (
+            self.multicurrency.amount_map
+            if hasattr(self, "multicurrency") and self.multicurrency
+            else {}
+        )
+
+    @property
     def spent_in_base_currency(self):
         if self.currency.is_base:
             return self.amount

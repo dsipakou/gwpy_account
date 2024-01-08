@@ -44,6 +44,15 @@ class TransactionSerializer(serializers.Serializer):
     transaction_date = serializers.CharField()
 
 
+class TransactionV2Serializer(serializers.Serializer):
+    uuid = serializers.UUIDField()
+    currency = serializers.UUIDField()
+    currency_code = serializers.CharField()
+    spent = serializers.FloatField()
+    spent_in_currencies = serializers.DictField()
+    transaction_date = serializers.CharField()
+
+
 class BudgetUsageSerializer(serializers.Serializer):
     uuid = serializers.UUIDField()
     title = serializers.CharField()
@@ -59,6 +68,25 @@ class BudgetUsageSerializer(serializers.Serializer):
     transactions = serializers.ListField(child=TransactionSerializer())
     spent_in_original_currency = serializers.FloatField()
     spent_in_base_currency = serializers.FloatField()
+    spent_in_currencies = serializers.DictField()
+    created_at = serializers.DateTimeField()
+    modified_at = serializers.DateTimeField()
+
+
+class BudgetUsageV2Serializer(serializers.Serializer):
+    uuid = serializers.UUIDField()
+    title = serializers.CharField()
+    budget_date = serializers.DateField()
+    category = serializers.UUIDField()
+    currency = serializers.UUIDField()
+    user = serializers.UUIDField()
+    is_completed = serializers.BooleanField()
+    recurrent = serializers.CharField()
+    description = serializers.CharField(allow_blank=True, allow_null=True)
+    transactions = serializers.ListField(child=TransactionV2Serializer())
+    planned = serializers.FloatField()
+    spent = serializers.FloatField()
+    planned_in_currencies = serializers.DictField()
     spent_in_currencies = serializers.DictField()
     created_at = serializers.DateTimeField()
     modified_at = serializers.DateTimeField()
@@ -90,6 +118,19 @@ class BudgetGroupedUsageSerializer(serializers.Serializer):
     items = serializers.ListField(child=BudgetUsageSerializer())
 
 
+class BudgetGroupedUsageV2Serializer(serializers.Serializer):
+    uuid = serializers.UUIDField()
+    user = serializers.UUIDField()
+    title = serializers.CharField()
+    planned = serializers.IntegerField()
+    spent = serializers.FloatField()
+    is_another_category = serializers.BooleanField()
+    is_another_month = serializers.BooleanField()
+    planned_in_currencies = serializers.DictField()
+    spent_in_currencies = serializers.DictField()
+    items = serializers.ListField(child=BudgetUsageV2Serializer())
+
+
 class CategoryBudgetSerializer(serializers.Serializer):
     uuid = serializers.UUIDField()
     category_name = serializers.CharField()
@@ -98,6 +139,16 @@ class CategoryBudgetSerializer(serializers.Serializer):
     planned_in_currencies = serializers.DictField()
     spent_in_original_currency = serializers.FloatField()
     spent_in_base_currency = serializers.FloatField()
+    spent_in_currencies = serializers.DictField()
+
+
+class CategoryBudgetV2Serializer(serializers.Serializer):
+    uuid = serializers.UUIDField()
+    category_name = serializers.CharField()
+    budgets = serializers.ListField(child=BudgetGroupedUsageV2Serializer())
+    planned = serializers.FloatField()
+    spent = serializers.FloatField()
+    planned_in_currencies = serializers.DictField()
     spent_in_currencies = serializers.DictField()
 
 

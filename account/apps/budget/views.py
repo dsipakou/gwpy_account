@@ -13,6 +13,7 @@ from rest_framework.generics import (GenericAPIView, ListAPIView,
                                      ListCreateAPIView,
                                      RetrieveUpdateDestroyAPIView)
 from rest_framework.response import Response
+from transactions.models import Transaction
 from users.filters import FilterByUser
 from users.permissions import BaseUserPermission
 from workspaces.filters import FilterByWorkspace
@@ -35,12 +36,21 @@ class BudgetList(ListCreateAPIView):
             raise ValidationError("Only parent categories can be used for budgets.")
         instance = serializer.save()
         headers = self.get_success_headers(serializer.data)
+        workspace = request.user.active_workspace
 
-        BudgetService.create_budget_multicurrency_amount([instance.uuid])
+        BudgetService.create_budget_multicurrency_amount(
+            [instance.uuid], workspace=workspace
+        )
 
         return Response(
             serializer.data, status=status.HTTP_201_CREATED, headers=headers
         )
+
+
+class BudgetPendingList(ListAPIView):
+    queryset = Budget.objects.filter(budget_date__isnull=True)
+    filter_backends = (FilterByUser, FilterByWorkspace)
+    serializer_class = serializers.BudgetSerializer
 
 
 class BudgetDetails(RetrieveUpdateDestroyAPIView):
@@ -59,28 +69,33 @@ class BudgetDetails(RetrieveUpdateDestroyAPIView):
         if serializer.validated_data["category"].parent is not None:
             raise ValidationError("Only parent categories can be used for budgets.")
         instance = serializer.save()
-        BudgetService.create_budget_multicurrency_amount([instance.uuid])
+        BudgetService.create_budget_multicurrency_amount(
+            [instance.uuid], workspace=instance.workspace
+        )
 
 
 class MonthlyUsageBudgetList(ListAPIView):
     queryset = Budget.objects.all()
     filter_backends = (FilterByUser, FilterByWorkspace)
-    serializer_class = serializers.CategoryBudgetSerializer
+    serializer_class = serializers.CategoryBudgetV2Serializer
 
     def list(self, request, *args, **kwargs):
-        date_from = request.GET.get(
-            "dateFrom", datetime.date.today() - datetime.timedelta(days=30)
-        )
+        date_from = request.GET.get("dateFrom", datetime.date.today())
         date_to = request.GET.get("dateTo", datetime.date.today())
         user = request.GET.get("user")
 
-        categories = BudgetService.load_budget(
-            self.filter_queryset(self.get_queryset()),
-            self.filter_queryset(Category.objects.all()),
-            Currency.objects.filter(workspace=request.user.active_workspace),
-            date_from,
-            date_to,
-            user,
+        categories = BudgetService.load_budget_v2(
+            queryset=self.filter_queryset(self.get_queryset()),
+            categories_qs=self.filter_queryset(Category.objects.all()),
+            currencies_qs=Currency.objects.filter(
+                workspace=request.user.active_workspace
+            ),
+            transactions_qs=Transaction.objects.filter(
+                workspace=request.user.active_workspace
+            ),
+            date_from=date_from,
+            date_to=date_to,
+            user=user,
         )
 
         serializer = self.get_serializer(categories, many=True)
@@ -133,5 +148,6 @@ class DuplicateBudgetView(GenericAPIView):
     def post(self, request, *args, **kwargs):
         serializer = self.get_serializer(data=request.data)
         serializer.is_valid(raise_exception=True)
-        BudgetService.duplicate_budget(serializer.data["uuids"])
+        workspace = request.user.active_workspace
+        BudgetService.duplicate_budget(serializer.data["uuids"], workspace=workspace)
         return Response(status=status.HTTP_201_CREATED)

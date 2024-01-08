@@ -32,6 +32,12 @@ class ChangeDefaultCurrencySerializer(serializers.Serializer):
     currency = serializers.CharField()
 
 
+class InviteRequestSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = Invite
+        fields = "__all__"
+
+
 class InviteSeriazlier(serializers.ModelSerializer):
     class Meta:
         model = Invite

@@ -15,21 +15,24 @@ from transactions.entities import (GroupedByCategory, GroupedByMonth,
                                    TransactionCurrencyDetails, TransactionItem,
                                    TransactionSpentInCurrencyDetails)
 from transactions.models import Transaction, TransactionMulticurrency
+from workspaces.models import Workspace
 
 from account.apps.categories.constants import CategoryType
 
 
 class TransactionService:
     @classmethod
-    def create_transaction_multicurrency_amount(cls, uuids: List[UUID]):
+    def create_transaction_multicurrency_amount(
+        cls, uuids: List[UUID], workspace: Workspace
+    ):
         amount_mapping = dict()
         transactions = Transaction.objects.select_related("currency").filter(
-            uuid__in=uuids
+            uuid__in=uuids, workspace=workspace
         )
         dates = transactions.values_list("transaction_date", flat=True).distinct()
-        rates_on_date = Rate.objects.filter(rate_date__in=dates)
+        rates_on_date = Rate.objects.filter(rate_date__in=dates, workspace=workspace)
         for transaction in transactions:
-            amount_mapping = generate_amount_map(transaction, rates_on_date)
+            amount_mapping = generate_amount_map(transaction, rates_on_date, workspace)
 
             TransactionMulticurrency.objects.update_or_create(
                 transaction=transaction, defaults={"amount_map": amount_mapping}

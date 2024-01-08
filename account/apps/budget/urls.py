@@ -11,4 +11,5 @@ urlpatterns = [
         name="weekly_usage_budget_list",
     ),
     path("duplicate/", views.DuplicateBudgetView.as_view(), name="duplicate_budget"),
+    path("pending/", views.BudgetPendingList.as_view(), name="pending_budget"),
 ]

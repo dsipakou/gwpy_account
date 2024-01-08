@@ -23,7 +23,7 @@ class Budget(models.Model):
     )
     title = models.CharField(max_length=60)
     amount = models.FloatField()
-    budget_date = models.DateField()
+    budget_date = models.DateField(blank=True, null=True)
     description = models.CharField(max_length=255, blank=True)
     is_completed = models.BooleanField(default=False)
     recurrent = models.CharField(
@@ -31,6 +31,14 @@ class Budget(models.Model):
     )
     created_at = models.DateTimeField(auto_now_add=True)
     modified_at = models.DateTimeField(auto_now=True)
+
+    @property
+    def multicurrency_map(self):
+        return (
+            self.multicurrency.amount_map
+            if hasattr(self, "multicurrency") and self.multicurrency
+            else {}
+        )
 
     class Meta:
         unique_together = ["title", "budget_date", "user"]

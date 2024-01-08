@@ -3,14 +3,16 @@ from django.contrib.auth import authenticate
 from rest_framework import status
 from rest_framework.authtoken.models import Token
 from rest_framework.authtoken.views import ObtainAuthToken
-from rest_framework.generics import CreateAPIView, ListAPIView, UpdateAPIView
-from rest_framework.permissions import AllowAny, IsAuthenticated
+from rest_framework.generics import (CreateAPIView, ListAPIView,
+                                     ListCreateAPIView, UpdateAPIView)
+from rest_framework.permissions import AllowAny
 from rest_framework.response import Response
 from users.filters import FilterByUser
 from users.models import Invite, User
 from users.serializers import (ChangeDefaultCurrencySerializer,
+                               InviteRequestSerializer, InviteSeriazlier,
                                RegisterSerializer, UserLoginSerializer,
-                               UserSerializer, InviteSeriazlier)
+                               UserSerializer)
 from workspaces.filters import FilterByWorkspace
 
 
@@ -75,20 +77,39 @@ class CurrencyView(UpdateAPIView):
         return Response(status=status.HTTP_200_OK)
 
 
-class InviteView(CreateAPIView):
+class InviteView(ListCreateAPIView):
     queryset = Invite.objects.all()
     serializer_class = InviteSeriazlier
+    filter_backends = (FilterByUser, FilterByWorkspace)
+
+    def list(self, request, *args, **kwargs):
+        queryset = self.filter_queryset(self.get_queryset()).filter(
+            invite_owner=request.user, workspace=request.user.active_workspace
+        )
+
+        page = self.paginate_queryset(queryset)
+        if page is not None:
+            serializer = InviteRequestSerializer(page, many=True)
+            return self.get_paginated_response(serializer.data)
+
+        serializer = InviteRequestSerializer(queryset, many=True)
+        return Response(serializer.data)
 
     def create(self, request, *args, **kwargs):
         data = {}
         try:
             data["invite_reciever"] = User.objects.get(email=request.data["email"])
         except User.DoesNotExist:
-            return Response(status=status.HTTP_400_BAD_REQUEST, data={"message": "This user does not exist"})
+            return Response(
+                status=status.HTTP_400_BAD_REQUEST,
+                data={"message": "This user does not exist"},
+            )
         data["invite_owner"] = request.user
         data["workspace"] = request.user.active_workspace.uuid
         serializer = self.get_serializer(data=data)
         serializer.is_valid(raise_exception=True)
         self.perform_create(serializer)
         headers = self.get_success_headers(serializer.data)
-        return Response(serializer.data, status=status.HTTP_201_CREATED, headers=headers)
+        return Response(
+            serializer.data, status=status.HTTP_201_CREATED, headers=headers
+        )

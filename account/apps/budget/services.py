@@ -13,11 +13,17 @@ from budget.models import Budget, BudgetMulticurrency
 from categories import constants
 from currencies.models import Currency
 from dateutil.relativedelta import relativedelta
-from django.db.models import Count, Prefetch, Q, QuerySet
+from django.db.models import (Count, FloatField, Prefetch, Q, QuerySet, Sum,
+                              Value)
+from django.db.models.fields.json import KeyTextTransform
+from django.db.models.functions import Cast, Coalesce, TruncMonth
 from rates.models import Rate
 from rates.utils import generate_amount_map
 from transactions.models import Rate, Transaction
+from users.models import User
 from workspaces.models import Workspace
+
+from account.apps.categories.constants import INCOME
 
 RECURRENT_TYPE_MAPPING = {
     BudgetDuplicateType.MONTHLY: {
@@ -83,10 +89,13 @@ class BudgetService:
         category_list = list(categories)
         available_currencies = currencies_qs.values("code", "is_base")
         transactions = transactions_qs.filter(
-            transaction_date__lte=date_to, transaction_date__gte=date_from
+            transaction_date__lte=date_to,
+            transaction_date__gte=date_from,
+            category__type=constants.EXPENSE,
         )
         if user:
             transactions = transactions.filter(user__uuid=user)
+            budgets = budgets.filter(user__uuid=user)
 
         transactions = transactions.select_related(
             "multicurrency",
@@ -99,41 +108,43 @@ class BudgetService:
         )
         transactions_eval = [transaction for transaction in transactions]
 
-        # Helper for keeping uuid -> index map
-        # 
-        # Example
-        #
-        # {
-        #     UUID('7b73d927-5f23-4d0f-a4d5-593727e24fb3'): {
-        #       'index': 0,
-        #       'items': {}
-        #     },
-        #     UUID('b1771ca2-0a8a-4f0a-bdec-d0af56cc022e'): {
-        #       'index': 1,
-        #       'items': {}
-        #     },
-        #     UUID('3a1c8476-126b-4820-a760-e20a0721edd7'): {
-        #         'index': 2,
-        #         'items': {
-        #             'category 1 3a1c8476-126b-4820-a760-e20a0721edd7': {
-        #                 'index': 0,
-        #                 'items': {
-        #                     UUID('4c0d91fe-77c1-4e2f-a4d5-00fe3f99a77c'): {'index': 0, 'items': {}}
-        #                 }
-        #             },
-        #             'category 2 3a1c8476-126b-4820-a760-e20a0721edd7': {
-        #                 'index': 1,
-        #                 'items': {UUID('8fe09547-1df4-429e-8b31-9ec4b7a5c54f'): {'index': 0, 'items': {}}}
-        #             }
-        #         }
-        #     },
-        # }
+        """
+        Helper for keeping uuid -> index map
+
+        Example
+
+        {
+            UUID('7b73d927-5f23-4d0f-a4d5-593727e24fb3'): {
+              'index': 0,
+              'items': {}
+            },
+            UUID('b1771ca2-0a8a-4f0a-bdec-d0af56cc022e'): {
+              'index': 1,
+              'items': {}
+            },
+            UUID('3a1c8476-126b-4820-a760-e20a0721edd7'): {
+                'index': 2,
+                'items': {
+                    'category 1 3a1c8476-126b-4820-a760-e20a0721edd7': {
+                        'index': 0,
+                        'items': {
+                            UUID('4c0d91fe-77c1-4e2f-a4d5-00fe3f99a77c'): {'index': 0, 'items': {}}
+                        }
+                    },
+                    'category 2 3a1c8476-126b-4820-a760-e20a0721edd7': {
+                        'index': 1,
+                        'items': {UUID('8fe09547-1df4-429e-8b31-9ec4b7a5c54f'): {'index': 0, 'items': {}}}
+                    }
+                }
+            },
+        }
+        """
 
         index_helper = {}
 
         grouped_categories = []
-        date_from_parsed = datetime.datetime.strptime(date_from, '%Y-%m-%d').date()
-        date_to_parsed = datetime.datetime.strptime(date_to, '%Y-%m-%d').date()
+        date_from_parsed = datetime.datetime.strptime(date_from, "%Y-%m-%d").date()
+        date_to_parsed = datetime.datetime.strptime(date_to, "%Y-%m-%d").date()
 
         # Add empty categories
         for category in category_list:
@@ -161,7 +172,11 @@ class BudgetService:
             category_item = grouped_categories[category_helper["index"]]
 
             # title + uuid + year-month uniqueness
-            grouped_budget_key = budget.title + str(budget.category.uuid) + date_from_parsed.strftime('%Y-%m')
+            grouped_budget_key = (
+                budget.title
+                + str(budget.category.uuid)
+                + date_from_parsed.strftime("%Y-%m")
+            )
             if grouped_budget_key not in category_helper["items"]:
                 category_item.budgets.append(
                     GroupedBudgetModel(
@@ -270,6 +285,11 @@ class BudgetService:
 
             budget = transaction.budget
 
+            # TODO: make a migration to rid off nullable budgets
+            # Legacy support when transaction can be without a budget
+            if not budget:
+                continue
+
             category_helper = index_helper[parent_category.uuid]
             category_item = grouped_categories[category_helper["index"]]
 
@@ -286,14 +306,19 @@ class BudgetService:
 
             # Find or append budget group to category
             # title + uuid + year-month uniqueness
-            grouped_budget_key = budget.title + str(budget.category.uuid) + budget.budget_date.strftime('%Y-%m')
+            grouped_budget_key = (
+                budget.title
+                + str(budget.category.uuid)
+                + budget.budget_date.strftime("%Y-%m")
+            )
             if grouped_budget_key not in category_helper["items"]:
                 category_item.budgets.append(
                     GroupedBudgetModel(
                         user=budget.user.uuid,
                         title=budget.title,
                         is_another_category=category_item.uuid != budget.category.uuid,
-                        is_another_month=budget.budget_date < date_from_parsed or budget.budget_date > date_to_parsed,
+                        is_another_month=budget.budget_date < date_from_parsed
+                        or budget.budget_date > date_to_parsed,
                         planned=0,
                         planned_in_currencies={
                             currency["code"]: 0 for currency in available_currencies
@@ -736,3 +761,49 @@ class BudgetService:
                 cls.create_budget_multicurrency_amount(
                     [budget.uuid], workspace=workspace
                 )
+
+    @classmethod
+    def get_last_months_usage(
+        cls,
+        *,
+        transactions: QuerySet,
+        month: str,
+        category_uuid: str,
+        user: User,
+        filter_by_user: Optional[str] = None,
+    ):
+        currency_code = user.currency_code()
+        if not currency_code:
+            return
+
+        selected_month_first_day = month.replace(day=1)
+        six_month_earlier = month - relativedelta(months=6)
+
+        transactions = transactions.filter(
+            category__parent=category_uuid,
+            transaction_date__lt=selected_month_first_day,
+            transaction_date__gte=six_month_earlier,
+        ).prefetch_related("multicurrency")
+
+        if filter_by_user:
+            transactions = transactions.filter(user=filter_by_user)
+
+        # get values for current default currency only
+        grouped_transactions = transactions.annotate(
+            current_currency_amount=Coalesce(
+                Cast(
+                    KeyTextTransform(currency_code, "multicurrency__amount_map"),
+                    FloatField(),
+                ),
+                Value(0, output_field=FloatField()),
+            )
+        )
+        # trunc dates to months
+        grouped_transactions = grouped_transactions.annotate(
+            month=TruncMonth("transaction_date")
+        ).values("month")
+        # group spent amount by months
+        grouped_transactions = grouped_transactions.annotate(
+            amount=Sum("current_currency_amount")
+        ).order_by("month")
+        return grouped_transactions

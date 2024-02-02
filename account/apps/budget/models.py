@@ -24,7 +24,7 @@ class Budget(models.Model):
     title = models.CharField(max_length=60)
     amount = models.FloatField()
     budget_date = models.DateField(blank=True, null=True)
-    description = models.CharField(max_length=255, blank=True)
+    description = models.TextField(null=True, blank=True)
     is_completed = models.BooleanField(default=False)
     recurrent = models.CharField(
         null=True, blank=True, max_length=20, choices=RECURRENT_CHOICES

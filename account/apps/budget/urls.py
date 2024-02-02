@@ -12,4 +12,9 @@ urlpatterns = [
     ),
     path("duplicate/", views.DuplicateBudgetView.as_view(), name="duplicate_budget"),
     path("pending/", views.BudgetPendingList.as_view(), name="pending_budget"),
+    path(
+        "last-months/",
+        views.LastMonthsBudgetUsageList.as_view(),
+        name="last_months_sum",
+    ),
 ]

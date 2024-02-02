@@ -86,12 +86,12 @@ class MonthlyUsageBudgetList(ListAPIView):
 
         categories = BudgetService.load_budget_v2(
             queryset=self.filter_queryset(self.get_queryset()),
-            categories_qs=self.filter_queryset(Category.objects.all()),
+            categories_qs=Category.objects.all(),
             currencies_qs=Currency.objects.filter(
                 workspace=request.user.active_workspace
             ),
-            transactions_qs=Transaction.objects.filter(
-                workspace=request.user.active_workspace
+            transactions_qs=self.filter_queryset(
+                Transaction.objects.filter(workspace=request.user.active_workspace)
             ),
             date_from=date_from,
             date_to=date_to,
@@ -137,7 +137,7 @@ class DuplicateBudgetView(GenericAPIView):
         pivot_date = request.query_params.get("date")
         if (recurrent_type := request.query_params.get("type")) is not None:
             budgets = BudgetService.get_duplicate_budget_candidates(
-                self.queryset, recurrent_type, pivot_date
+                self.filter_queryset(self.queryset), recurrent_type, pivot_date
             )
             response_serializer = DuplicateResponseSerializer(data=budgets, many=True)
             response_serializer.is_valid(raise_exception=True)
@@ -151,3 +151,29 @@ class DuplicateBudgetView(GenericAPIView):
         workspace = request.user.active_workspace
         BudgetService.duplicate_budget(serializer.data["uuids"], workspace=workspace)
         return Response(status=status.HTTP_201_CREATED)
+
+
+class LastMonthsBudgetUsageList(ListAPIView):
+    queryset = Transaction.objects.all()
+    filter_backends = (FilterByUser, FilterByWorkspace)
+    serializer_class = serializers.LastMonthsUsageSerializer
+
+    def list(self, request, *args, **kwargs):
+        target_month = request.GET.get("month", datetime.date.today())
+        user = request.GET.get("user")
+        category_uuid = request.GET.get("category")
+
+        if not category_uuid:
+            return Response(status=status.HTTP_400_BAD_REQUEST)
+
+        grouped_transactions = BudgetService.get_last_months_usage(
+            transactions=self.filter_queryset(self.queryset),
+            month=target_month,
+            user=request.user,
+            filter_by_user=user,
+            category_uuid=category_uuid,
+        )
+
+        serializer = self.get_serializer(instance=grouped_transactions, many=True)
+
+        return Response(serializer.data)

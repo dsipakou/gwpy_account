@@ -1,5 +1,5 @@
 import datetime
-from typing import Dict, List, TypedDict
+from typing import Dict, List, Optional, TypedDict
 from uuid import UUID, uuid4
 
 import pydantic
@@ -55,9 +55,9 @@ class BudgetModel(pydantic.BaseModel):
     budget_date: datetime.date
     transactions: List[BudgetTransactionModel] = pydantic.Field(default_factory=list)
     category_name: str
-    description: str
+    description: Optional[str]
     is_completed: bool
-    recurrent: str
+    recurrent: Optional[str]
     planned: float = pydantic.Field(ge=0, default=0)
     spent: float = pydantic.Field(ge=0, default=0)
     planned_in_currencies: dict[str, float] = pydantic.Field(default_factory=dict)

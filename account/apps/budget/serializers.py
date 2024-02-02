@@ -152,6 +152,16 @@ class CategoryBudgetV2Serializer(serializers.Serializer):
     spent_in_currencies = serializers.DictField()
 
 
+class LastMonthsUsageSerializer(serializers.Serializer):
+    month = serializers.DateField()
+    amount = serializers.FloatField()
+
+    def to_representation(self, instance):
+        data = super().to_representation(instance)
+        data["amount"] = round(data["amount"], 2)
+        return data
+
+
 class DuplicateRequestSerializer(serializers.Serializer):
     uuids = serializers.ListField()
 

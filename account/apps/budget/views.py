@@ -83,15 +83,16 @@ class MonthlyUsageBudgetList(ListAPIView):
         date_from = request.GET.get("dateFrom", datetime.date.today())
         date_to = request.GET.get("dateTo", datetime.date.today())
         user = request.GET.get("user")
+        queryset = self.filter_queryset(self.get_queryset())
 
         categories = BudgetService.load_budget_v2(
-            queryset=self.filter_queryset(self.get_queryset()),
+            queryset=queryset,
             categories_qs=Category.objects.all(),
             currencies_qs=Currency.objects.filter(
                 workspace=request.user.active_workspace
             ),
-            transactions_qs=self.filter_queryset(
-                Transaction.objects.filter(workspace=request.user.active_workspace)
+            transactions_qs=Transaction.objects.prefetch_related("budget").filter(
+                workspace=request.user.active_workspace, budget__in=queryset
             ),
             date_from=date_from,
             date_to=date_to,
@@ -154,21 +155,29 @@ class DuplicateBudgetView(GenericAPIView):
 
 
 class LastMonthsBudgetUsageList(ListAPIView):
-    queryset = Transaction.objects.all()
+    queryset = Budget.objects.all()
     filter_backends = (FilterByUser, FilterByWorkspace)
     serializer_class = serializers.LastMonthsUsageSerializer
 
     def list(self, request, *args, **kwargs):
-        target_month = request.GET.get("month", datetime.date.today())
+        month_request = request.GET.get("month")
+        if month_request:
+            month = datetime.datetime.strptime(month_request, "%Y-%m-%d").date()
+        else:
+            month = datetime.date.today()
         user = request.GET.get("user")
         category_uuid = request.GET.get("category")
 
         if not category_uuid:
             return Response(status=status.HTTP_400_BAD_REQUEST)
 
+        queryset = self.filter_queryset(self.get_queryset())
+
         grouped_transactions = BudgetService.get_last_months_usage(
-            transactions=self.filter_queryset(self.queryset),
-            month=target_month,
+            transactions=Transaction.objects.prefetch_related("budget").filter(
+                budget__in=queryset
+            ),
+            month=month,
             user=request.user,
             filter_by_user=user,
             category_uuid=category_uuid,

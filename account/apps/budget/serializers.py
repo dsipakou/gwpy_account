@@ -158,7 +158,7 @@ class LastMonthsUsageSerializer(serializers.Serializer):
 
     def to_representation(self, instance):
         data = super().to_representation(instance)
-        data["amount"] = round(data["amount"], 2)
+        data["amount"] = round(data["amount"], 0)
         return data
 
 

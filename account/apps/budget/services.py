@@ -94,7 +94,7 @@ class BudgetService:
             category__type=constants.EXPENSE,
         )
         if user:
-            transactions = transactions.filter(user__uuid=user)
+            transactions = transactions.filter(budget__user__uuid=user)
             budgets = budgets.filter(user__uuid=user)
 
         transactions = transactions.select_related(
@@ -767,7 +767,7 @@ class BudgetService:
         cls,
         *,
         transactions: QuerySet,
-        month: str,
+        month: datetime.date,
         category_uuid: str,
         user: User,
         filter_by_user: Optional[str] = None,

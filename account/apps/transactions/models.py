@@ -120,7 +120,7 @@ class Transaction(models.Model):
     ):
         filtered_qs = (
             qs.select_related("category", "category__parent", "multicurrency")
-            .values("category__parent", "category__parent__name")
+            .values("category__name", "category__parent", "category__parent__name")
             .annotate(
                 parent_sum=models.Sum(
                     Cast(

@@ -3,14 +3,22 @@ from django.db.models import F, Window
 from django.db.models.functions import RowNumber
 from rates.filters import DateFilter
 from rates.models import Rate
-from rates.serializers import (AvailableRates, CreateBatchedRateSerializer,
-                               RateChartDataSerializer, RateChartSerializer,
-                               RateSerializer)
+from rates.serializers import (
+    AvailableRates,
+    CreateBatchedRateSerializer,
+    RateChartDataSerializer,
+    RateChartSerializer,
+    RateSerializer,
+)
 from rates.services import RateService
 from rates.utils import generate_date_seq
-from rest_framework.generics import (CreateAPIView, GenericAPIView,
-                                     ListAPIView, ListCreateAPIView,
-                                     RetrieveUpdateDestroyAPIView)
+from rest_framework.generics import (
+    CreateAPIView,
+    GenericAPIView,
+    ListAPIView,
+    ListCreateAPIView,
+    RetrieveUpdateDestroyAPIView,
+)
 from rest_framework.response import Response
 from rest_framework.status import HTTP_400_BAD_REQUEST
 from users.filters import FilterByUser

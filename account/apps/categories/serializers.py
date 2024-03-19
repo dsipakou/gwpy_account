@@ -35,3 +35,14 @@ class CategorySerializer(serializers.ModelSerializer):
             workspace=user.active_workspace,
             **validated_data,
         )
+
+
+class CategoryReassignSerializer(serializers.Serializer):
+    category = serializers.UUIDField()
+
+    def validate(self, attrs):
+        category = attrs.get("category")
+        if not Category.objects.filter(uuid=category).exists():
+            raise serializers.ValidationError("Destinated category does not exists")
+
+        return super().validate(attrs)

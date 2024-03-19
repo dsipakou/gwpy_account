@@ -27,3 +27,14 @@ class AccountSerializer(serializers.ModelSerializer):
             "workspace": workspace,
         }
         return super().create(data)
+
+
+class AccountReassignSerializer(serializers.Serializer):
+    account = serializers.UUIDField()
+
+    def validate(self, attrs):
+        account = attrs.get("account")
+        if not Account.objects.filter(uuid=account).exists():
+            raise serializers.ValidationError("Destinated account does not exists")
+
+        return super().validate(attrs)

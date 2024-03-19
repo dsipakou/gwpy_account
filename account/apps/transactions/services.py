@@ -8,12 +8,17 @@ from categories.models import Category
 from django.db.models import QuerySet
 from rates.models import Rate
 from rates.utils import generate_amount_map
-from transactions.entities import (GroupedByCategory, GroupedByMonth,
-                                   GroupedByParent, TransactionAccountDetails,
-                                   TransactionBudgetDetails,
-                                   TransactionCategoryDetails,
-                                   TransactionCurrencyDetails, TransactionItem,
-                                   TransactionSpentInCurrencyDetails)
+from transactions.entities import (
+    GroupedByCategory,
+    GroupedByMonth,
+    GroupedByParent,
+    TransactionAccountDetails,
+    TransactionBudgetDetails,
+    TransactionCategoryDetails,
+    TransactionCurrencyDetails,
+    TransactionItem,
+    TransactionSpentInCurrencyDetails,
+)
 from transactions.models import Transaction, TransactionMulticurrency
 from workspaces.models import Workspace
 
@@ -266,11 +271,7 @@ class ReportService:
             start_date = start_date.replace(day=1) + datetime.timedelta(days=32)
             start_date = start_date.replace(day=1)
 
-        categories_list = (
-            categories_qs.values_list("name", flat=True)
-            .filter(parent__isnull=True, type=category_constants.EXPENSE)
-            .order_by("name")
-        )
+        categories_list = categories_qs.filter(parent__isnull=True).order_by("name")
 
         output = []
 
@@ -281,8 +282,9 @@ class ReportService:
             current_date_category_list = []
             for category in categories_list:
                 categories_map = {}
-                categories_map["name"] = category
-                categories_map["value"] = grouped_item.get(category, 0)
+                categories_map["name"] = category.name
+                categories_map["value"] = grouped_item.get(category.name, 0)
+                categories_map["category_type"] = str(category.type)
                 current_date_category_list.append(categories_map)
             current_item["categories"] = current_date_category_list
             output.append(current_item)
@@ -295,6 +297,14 @@ class ReportService:
         for item in qs:
             key = item["year_month"].strftime("%Y-%m")
             output[key] = output.get(key, {})
-            output[key][item["category__parent__name"]] = item["parent_sum"]
+            if item["category__parent"]:
+                output[key][item["category__parent__name"]] = (
+                    output[key].get(item["category__parent__name"], 0)
+                    + item["parent_sum"]
+                )
+            else:
+                output[key][item["category__name"]] = (
+                    output[key].get(item["category__name"], 0) + item["parent_sum"]
+                )
 
         return output

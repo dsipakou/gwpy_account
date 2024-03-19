@@ -5,16 +5,22 @@ from uuid import UUID
 
 from budget import utils
 from budget.constants import BudgetDuplicateType
-from budget.entities import (BudgetGroupedItem, BudgetItem, BudgetModel,
-                             BudgetTransactionItem, BudgetTransactionModel,
-                             CategoryItem, CategoryModel, GroupedBudgetModel)
+from budget.entities import (
+    BudgetGroupedItem,
+    BudgetItem,
+    BudgetModel,
+    BudgetTransactionItem,
+    BudgetTransactionModel,
+    CategoryItem,
+    CategoryModel,
+    GroupedBudgetModel,
+)
 from budget.exceptions import UnsupportedDuplicateTypeError
 from budget.models import Budget, BudgetMulticurrency
 from categories import constants
 from currencies.models import Currency
 from dateutil.relativedelta import relativedelta
-from django.db.models import (Count, FloatField, Prefetch, Q, QuerySet, Sum,
-                              Value)
+from django.db.models import Count, FloatField, Prefetch, Q, QuerySet, Sum, Value
 from django.db.models.fields.json import KeyTextTransform
 from django.db.models.functions import Cast, Coalesce, TruncMonth
 from rates.models import Rate

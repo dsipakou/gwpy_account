@@ -1,9 +1,13 @@
 from budget.models import Budget
 from categories.models import Category
-from categories.serializers import CategorySerializer
-from rest_framework.exceptions import ValidationError
-from rest_framework.generics import (ListCreateAPIView,
-                                     RetrieveUpdateDestroyAPIView)
+from categories.serializers import CategoryReassignSerializer, CategorySerializer
+from rest_framework.exceptions import ValidationError, status
+from rest_framework.generics import (
+    ListCreateAPIView,
+    CreateAPIView,
+    RetrieveUpdateDestroyAPIView,
+)
+from rest_framework.mixins import Response
 from transactions.models import Transaction
 from workspaces.filters import FilterByWorkspace
 from workspaces.permissions import BaseWorkspacePermission
@@ -12,6 +16,7 @@ from workspaces.permissions import BaseWorkspacePermission
 class CategoryList(ListCreateAPIView):
     queryset = Category.objects.all().select_related("parent").order_by("name")
     serializer_class = CategorySerializer
+    permission_classes = (BaseWorkspacePermission,)
     filter_backends = (FilterByWorkspace,)
 
     def perform_create(self, serializer):
@@ -76,3 +81,22 @@ class CategoryDetails(RetrieveUpdateDestroyAPIView):
                 "Cannot delete category. There are transactions assigned"
             )
         super().perform_destroy(instance)
+
+
+class CategoryReassignView(CreateAPIView):
+    queryset = Category.objects.all()
+    serializer_class = CategoryReassignSerializer
+    permission_classes = (BaseWorkspacePermission,)
+    lookup_field = "uuid"
+
+    def post(self, request, *args, **kwargs):
+        serializer = self.get_serializer(data=request.data)
+        serializer.is_valid()
+        source_category_uuid = kwargs.get("uuid")
+        dest_category_uuid = serializer.validated_data["category"]
+        if source_category_uuid == dest_category_uuid:
+            raise ValidationError("Cannot reassign to the same category")
+
+        transactions = Transaction.objects.filter(category__uuid=source_category_uuid)
+        transactions.update(category=dest_category_uuid)
+        return Response(status=status.HTTP_200_OK)

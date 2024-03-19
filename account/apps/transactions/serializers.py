@@ -1,3 +1,4 @@
+from categories import constants
 from rest_framework import serializers
 from rest_framework.exceptions import ValidationError
 from transactions.models import LastViewed, Transaction
@@ -82,6 +83,9 @@ class TransactionCreateSerializer(serializers.ModelSerializer):
         workspace = validated_data["user"].active_workspace
         if not workspace:
             raise ValidationError("User has no active workspace")
+        category_type = validated_data["category"].type
+        if category_type == constants.EXPENSE and validated_data["budget"] is None:
+            raise ValidationError("Expsense should contain budget specified")
         data = {
             **validated_data,
             "workspace": workspace,
@@ -116,6 +120,7 @@ class ReportByMonthSerializer(serializers.Serializer):
 class ReportCategoryDetailsSerializer(serializers.Serializer):
     name = serializers.CharField()
     value = serializers.FloatField()
+    category_type = serializers.CharField(max_length=3)
 
 
 class ReportChartSerializer(serializers.Serializer):

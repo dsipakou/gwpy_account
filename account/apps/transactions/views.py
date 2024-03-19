@@ -4,17 +4,22 @@ from categories import constants
 from categories.models import Category
 from django.db.models.query import QuerySet
 from rest_framework import status
-from rest_framework.generics import (ListAPIView, ListCreateAPIView,
-                                     RetrieveUpdateDestroyAPIView)
+from rest_framework.generics import (
+    ListAPIView,
+    ListCreateAPIView,
+    RetrieveUpdateDestroyAPIView,
+)
 from rest_framework.response import Response
 from transactions.models import LastViewed, Transaction
-from transactions.serializers import (GroupedTransactionSerializer,
-                                      IncomeSerializer,
-                                      ReportByMonthSerializer,
-                                      ReportChartSerializer,
-                                      TransactionCreateSerializer,
-                                      TransactionDetailsSerializer,
-                                      TransactionSerializer)
+from transactions.serializers import (
+    GroupedTransactionSerializer,
+    IncomeSerializer,
+    ReportByMonthSerializer,
+    ReportChartSerializer,
+    TransactionCreateSerializer,
+    TransactionDetailsSerializer,
+    TransactionSerializer,
+)
 from transactions.services import ReportService, TransactionService
 from users.filters import FilterByUser
 from workspaces.filters import FilterByWorkspace
@@ -155,7 +160,7 @@ class TransactionReportMonthly(ListAPIView):
 
     def list(self, request, *args, **kwargs):
         qs = self.filter_queryset(self.get_queryset())
-        categories_qs = self.filter_queryset(Category.objects.all())
+        categories_qs = Category.objects.all()
         date_to = datetime.strptime(request.GET["dateTo"], "%Y-%m-%d")
         date_from = datetime.strptime(request.GET["dateFrom"], "%Y-%m-%d")
         currency_code = request.GET.get("currency")

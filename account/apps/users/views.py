@@ -3,16 +3,25 @@ from django.contrib.auth import authenticate
 from rest_framework import status
 from rest_framework.authtoken.models import Token
 from rest_framework.authtoken.views import ObtainAuthToken
-from rest_framework.generics import (CreateAPIView, ListAPIView,
-                                     ListCreateAPIView, UpdateAPIView)
+from rest_framework.generics import (
+    CreateAPIView,
+    ListAPIView,
+    ListCreateAPIView,
+    UpdateAPIView,
+    DestroyAPIView,
+)
 from rest_framework.permissions import AllowAny
 from rest_framework.response import Response
 from users.filters import FilterByUser
 from users.models import Invite, User
-from users.serializers import (ChangeDefaultCurrencySerializer,
-                               InviteRequestSerializer, InviteSeriazlier,
-                               RegisterSerializer, UserLoginSerializer,
-                               UserSerializer)
+from users.serializers import (
+    ChangeDefaultCurrencySerializer,
+    InviteRequestSerializer,
+    InviteSeriazlier,
+    RegisterSerializer,
+    UserLoginSerializer,
+    UserSerializer,
+)
 from workspaces.filters import FilterByWorkspace
 
 
@@ -62,7 +71,7 @@ class RegisterView(CreateAPIView):
 class CurrencyView(UpdateAPIView):
     queryset = Currency.objects.all()
     serializer_class = ChangeDefaultCurrencySerializer
-    filter_backends = (FilterByUser, FilterByWorkspace)
+    filter_backends = (FilterByWorkspace,)
     lookup_field = "code"
 
     def update(self, request, *args, **kwargs):
@@ -102,7 +111,7 @@ class InviteView(ListCreateAPIView):
         except User.DoesNotExist:
             return Response(
                 status=status.HTTP_400_BAD_REQUEST,
-                data={"message": "This user does not exist"},
+                data={"message": "Cannot invite this user"},
             )
         data["invite_owner"] = request.user
         data["workspace"] = request.user.active_workspace.uuid
@@ -113,3 +122,9 @@ class InviteView(ListCreateAPIView):
         return Response(
             serializer.data, status=status.HTTP_201_CREATED, headers=headers
         )
+
+
+class RevokeInviteView(DestroyAPIView):
+    queryset = Invite.objects.all()
+    filter_backends = (FilterByUser, FilterByWorkspace)
+    lookup_field = "uuid"

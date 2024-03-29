@@ -1,6 +1,7 @@
 from budget.models import Budget
 from categories.models import Category
 from categories.serializers import CategoryReassignSerializer, CategorySerializer
+from django.db.models.deletion import transaction
 from rest_framework.exceptions import ValidationError, status
 from rest_framework.generics import (
     ListCreateAPIView,
@@ -74,7 +75,7 @@ class CategoryDetails(RetrieveUpdateDestroyAPIView):
 
         if Category.objects.filter(parent=instance).exists():
             raise ValidationError("Cannot delete non empty parent category")
-        if Budget.objects.filter(category=instance).exists():
+        if Budget.objects.filter(category=instance.parent or instance).exists():
             raise ValidationError("Cannot delete category. There are budgets assigned")
         if Transaction.objects.filter(category=instance).exists():
             raise ValidationError(
@@ -97,6 +98,11 @@ class CategoryReassignView(CreateAPIView):
         if source_category_uuid == dest_category_uuid:
             raise ValidationError("Cannot reassign to the same category")
 
+        source_category = Category.objects.get(uuid=source_category_uuid)
+        dest_category = Category.objects.get(uuid=dest_category_uuid)
         transactions = Transaction.objects.filter(category__uuid=source_category_uuid)
-        transactions.update(category=dest_category_uuid)
+        budgets = Budget.objects.filter(category__uuid=source_category.parent.uuid)
+        with transaction.atomic():
+            transactions.update(category=dest_category.uuid)
+            budgets.update(category=dest_category.parent.uuid)
         return Response(status=status.HTTP_200_OK)

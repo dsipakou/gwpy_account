@@ -1,0 +1,9 @@
+{
+  "version": "1",
+  "name": "fly-account",
+  "type": "collection",
+  "ignore": [
+    "node_modules",
+    ".git"
+  ]
+}

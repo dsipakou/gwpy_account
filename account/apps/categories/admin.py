@@ -1,7 +1,8 @@
-from budget.models import Budget
-from categories.models import Category
 from django import forms
 from django.contrib import admin
+
+from budget.models import Budget
+from categories.models import Category
 
 
 class CategoryFormAdmin(forms.ModelForm):

@@ -26,5 +26,6 @@ urlpatterns = [
     path("rates/", include("rates.urls")),
     path("transactions/", include("transactions.urls")),
     path("users/", include("users.urls")),
+    path("roles/", include("roles.urls")),
     path("auth/", obtain_auth_token),
 ]

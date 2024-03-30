@@ -1,7 +1,8 @@
 import uuid
 
-from budget.constants import BudgetDuplicateType
 from django.db import models
+
+from budget.constants import BudgetDuplicateType
 
 
 class Budget(models.Model):

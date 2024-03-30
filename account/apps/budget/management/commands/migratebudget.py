@@ -1,9 +1,10 @@
 import csv
 import uuid
 
+from django.core.management.base import BaseCommand
+
 from budget.models import Budget
 from categories.models import Category
-from django.core.management.base import BaseCommand
 
 
 class Command(BaseCommand):

@@ -1,7 +1,6 @@
 from datetime import date, datetime, timedelta
 
-from categories import constants
-from categories.models import Category
+from account.apps.transactions.serializers import LastViewedSerializer
 from django.db.models.query import QuerySet
 from rest_framework import status
 from rest_framework.generics import (
@@ -10,6 +9,9 @@ from rest_framework.generics import (
     RetrieveUpdateDestroyAPIView,
 )
 from rest_framework.response import Response
+
+from categories import constants
+from categories.models import Category
 from transactions.models import LastViewed, Transaction
 from transactions.serializers import (
     GroupedTransactionSerializer,
@@ -23,8 +25,6 @@ from transactions.serializers import (
 from transactions.services import ReportService, TransactionService
 from users.filters import FilterByUser
 from workspaces.filters import FilterByWorkspace
-
-from account.apps.transactions.serializers import LastViewedSerializer
 
 
 class TransactionList(ListCreateAPIView):

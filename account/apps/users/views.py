@@ -1,27 +1,31 @@
-from currencies.models import Currency
 from django.contrib.auth import authenticate
 from rest_framework import status
 from rest_framework.authtoken.models import Token
 from rest_framework.authtoken.views import ObtainAuthToken
 from rest_framework.generics import (
     CreateAPIView,
+    DestroyAPIView,
     ListAPIView,
     ListCreateAPIView,
     UpdateAPIView,
-    DestroyAPIView,
 )
 from rest_framework.permissions import AllowAny
 from rest_framework.response import Response
+
+from currencies.models import Currency
+from roles.models import Role, UserRole
 from users.filters import FilterByUser
 from users.models import Invite, User
 from users.serializers import (
     ChangeDefaultCurrencySerializer,
+    ChangeUserRoleSerializer,
     InviteRequestSerializer,
     InviteSeriazlier,
     RegisterSerializer,
     UserLoginSerializer,
     UserSerializer,
 )
+from users.entities import UserSchema
 from workspaces.filters import FilterByWorkspace
 
 
@@ -29,8 +33,18 @@ class UserList(ListAPIView):
     serializer_class = UserSerializer
 
     def list(self, request, *args, **kwargs):
-        members = request.user.active_workspace.members
-        serializer = self.get_serializer(members, many=True)
+        user = request.user
+        members = user.active_workspace.members
+        output = []
+        for member in members.values():
+            usr = UserSchema(**member)
+            try:
+                user_role = UserRole.objects.get(workspace=user.active_workspace, user__uuid=member["uuid"])
+                usr.role = user_role.role.name
+            except UserRole.DoesNotExist:
+                pass
+            output.append(usr)
+        serializer = self.get_serializer(output, many=True)
         return Response(serializer.data)
 
 
@@ -128,3 +142,25 @@ class RevokeInviteView(DestroyAPIView):
     queryset = Invite.objects.all()
     filter_backends = (FilterByUser, FilterByWorkspace)
     lookup_field = "uuid"
+
+
+class ChangeUserRoleView(UpdateAPIView):
+    serializer_class = ChangeUserRoleSerializer
+
+    def update(self, request, *args, **kwargs):
+        serializer = self.get_serializer(data=request.data)
+        serializer.is_valid(raise_exception=True)
+        try:
+            target_user = User.objects.get(uuid=kwargs.get("uuid"))
+            target_role = Role.objects.get(name=serializer.validated_data["role"])
+        except User.DoesNotExist:
+            return Response("User not found", status=status.HTTP_404_NOT_FOUND)
+        except Role.DoesNotExist:
+            return Response("Role not found", status=status.HTTP_404_NOT_FOUND)
+        user = request.user
+        UserRole.objects.update_or_create(
+            user=target_user,
+            workspace=user.active_workspace,
+            defaults={"role": target_role},
+        )
+        return Response(status=status.HTTP_200_OK)

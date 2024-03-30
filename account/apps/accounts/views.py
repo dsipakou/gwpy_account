@@ -1,6 +1,3 @@
-from accounts.models import Account
-from accounts.permissions import BaseAccountPermission
-from accounts.serializers import AccountReassignSerializer, AccountSerializer
 from rest_framework import status
 from rest_framework.generics import (
     CreateAPIView,
@@ -9,6 +6,10 @@ from rest_framework.generics import (
     ValidationError,
 )
 from rest_framework.response import Response
+
+from accounts.models import Account
+from accounts.permissions import BaseAccountPermission
+from accounts.serializers import AccountReassignSerializer, AccountSerializer
 from transactions.models import Transaction
 from users.filters import FilterByUser
 from users.permissions import BaseUserPermission
@@ -46,7 +47,7 @@ class AccountReassignView(CreateAPIView):
 
     def post(self, request, *args, **kwargs):
         serializer = self.get_serializer(data=request.data)
-        serializer.is_valid()
+        serializer.is_valid(raise_exception=True)
         source_account_uuid = kwargs.get("uuid")
         dest_account_uuid = serializer.validated_data["account"]
         if source_account_uuid == dest_account_uuid:

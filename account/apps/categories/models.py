@@ -1,8 +1,9 @@
 import uuid
 
-from categories import constants
 from django.db import models
 from django.db.models import Q
+
+from categories import constants
 
 
 class Category(models.Model):
@@ -37,4 +38,4 @@ class Category(models.Model):
         ]
 
     def __str__(self):
-        return self.name
+        return str(self.name)

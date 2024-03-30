@@ -1,6 +1,7 @@
-from categories import constants
 from rest_framework import serializers
 from rest_framework.exceptions import ValidationError
+
+from categories import constants
 from transactions.models import LastViewed, Transaction
 
 

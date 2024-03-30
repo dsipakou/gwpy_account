@@ -1,8 +1,9 @@
 import csv
 import uuid
 
-from categories.models import Category
 from django.core.management.base import BaseCommand
+
+from categories.models import Category
 
 
 class Command(BaseCommand):

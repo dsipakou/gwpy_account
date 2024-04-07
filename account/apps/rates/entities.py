@@ -1,4 +1,8 @@
+from datetime import date
 from typing import List, TypedDict
+from uuid import UUID
+
+from pydantic import BaseModel
 
 
 class RateItem(TypedDict):
@@ -11,3 +15,9 @@ class BatchedRateRequest(TypedDict):
     rate_date: str
     user: str
     items: List[RateItem]
+
+
+class RateOnDate(BaseModel):
+    currency_code: str
+    rate: float
+    rate_date: date

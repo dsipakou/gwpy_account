@@ -113,6 +113,6 @@ class CategoryItem(TypedDict):
     spent_in_currencies: Dict[str, float]
 
 
-class MonthUsageSum(TypedDict):
+class MonthUsageSum(pydantic.BaseModel):
     month: datetime.date
-    planned: float
+    amount: float

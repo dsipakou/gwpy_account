@@ -1,4 +1,6 @@
-from django.db.models import F, Window
+import datetime
+from account.apps.rates.entities import RateOnDate
+from django.db.models import F, Window, OuterRef, Subquery, Max
 from django.db.models.functions import RowNumber
 from rest_framework.generics import (
     CreateAPIView,
@@ -146,6 +148,7 @@ class RateChartData(ListAPIView):
 class AvailableRates(GenericAPIView):
     queryset = Rate.objects.all()
     filter_backends = (FilterByWorkspace,)
+    serializer_class = AvailableRates
 
     def get(self, request, *args, **kwargs):
         date = request.GET.get("date")
@@ -155,28 +158,34 @@ class AvailableRates(GenericAPIView):
                 exception=True,
                 data={"details": "date_not_found"},
             )
-        currencies = self.filter_queryset(Currency.objects.all())
-        rates_qs = (
+        base_currency = self.filter_queryset(Currency.objects.all()).get(is_base=True)
+        max_dates = (
             self.filter_queryset(self.get_queryset())
-            .filter(rate_date=date)
-            .values("currency_id", "rate")
+            .filter(base_currency=base_currency, rate_date__lte=date)
+            .values("currency")
+            .annotate(max_date=Max("rate_date"))
         )
-        rates = {rate["currency_id"]: rate["rate"] for rate in rates_qs}
-        first_rate = Rate.objects.filter(rate_date=date).first()
-        available_rates = {}
-        for currency in currencies:
-            # if rate exists for current item
-            # or
-            # if currency is base for the first rate on date
-            # or
-            # if no rates but currency is base now
-            if currency.uuid in rates:
-                available_rates[currency.code] = rates[currency.uuid]
-            elif (first_rate and currency == first_rate.base_currency) or (
-                not first_rate and currency.is_base
-            ):
-                available_rates[currency.code] = 1
-            else:
-                available_rates[currency.code] = None
-        serializer_data = AvailableRates(data=available_rates)
+
+        available_rates = [
+            RateOnDate(
+                currency_code=base_currency.code,
+                rate=1,
+                rate_date=date,
+            )
+        ]
+        rates_qs = self.filter_queryset(Rate.objects.all())
+        for date in max_dates:
+            rate = rates_qs.filter(
+                currency=date["currency"], rate_date=date["max_date"]
+            )[0]
+
+            available_rates.append(
+                RateOnDate(
+                    currency_code=rate.currency.code,
+                    rate=rate.rate,
+                    rate_date=rate.rate_date,
+                )
+            )
+
+        serializer_data = self.get_serializer(instance=available_rates, many=True)
         return Response(serializer_data.data)

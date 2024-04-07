@@ -171,3 +171,6 @@ fly.toml
 .dockerignore
 Dockerfile.backup
 Dockerfile.fly
+
+# Bruno API client 
+fly-account

@@ -2,14 +2,15 @@
 
 from django.db import migrations
 from roles.models import Role
+from roles.constants import Roles
 
 
 def create_default_roles(apps, schema_editor):
     Role.objects.bulk_create(
         [
-            Role(name="owner", is_system=True),
-            Role(name="admin", is_system=True),
-            Role(name="member", is_system=True),
+            Role(name=str(Roles.OWNER), is_system=True),
+            Role(name=str(Roles.ADMIN), is_system=True),
+            Role(name=str(Roles.MEMBER), is_system=True),
         ]
     )
 

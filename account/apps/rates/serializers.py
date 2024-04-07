@@ -52,4 +52,6 @@ class RateChartSerializer(serializers.Serializer):
 
 
 class AvailableRates(serializers.Serializer):
-    rates = serializers.DictField()
+    currency_code = serializers.CharField()
+    rate = serializers.FloatField()
+    rate_date = serializers.DateField()

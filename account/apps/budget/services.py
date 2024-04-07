@@ -1,4 +1,5 @@
 import datetime
+from dateutil.rrule import rrule, MONTHLY
 import logging
 from typing import Dict, List, Optional
 from uuid import UUID
@@ -20,6 +21,7 @@ from budget.entities import (
     CategoryItem,
     CategoryModel,
     GroupedBudgetModel,
+    MonthUsageSum,
 )
 from budget.exceptions import UnsupportedDuplicateTypeError
 from budget.models import Budget, BudgetMulticurrency
@@ -777,7 +779,7 @@ class BudgetService:
         category_uuid: str,
         user: User,
         filter_by_user: Optional[str] = None,
-    ):
+    ) -> List[MonthUsageSum]:
         currency_code = user.currency_code()
         if not currency_code:
             return
@@ -812,4 +814,23 @@ class BudgetService:
         grouped_transactions = grouped_transactions.annotate(
             amount=Sum("current_currency_amount")
         ).order_by("month")
-        return grouped_transactions
+        all_months = rrule(
+            MONTHLY,
+            dtstart=six_month_earlier,
+            until=selected_month_first_day - relativedelta(months=1),
+        )
+
+        # add empty months with 0 amount
+        clean_transactions: List[MonthUsageSum] = []
+        for current_month in all_months:
+            if transaction := grouped_transactions.filter(month=current_month).first():
+                amount = transaction.get("amount", 0)
+            else:
+                amount = 0
+            clean_transactions.append(
+                MonthUsageSum(
+                    month=current_month.date(),
+                    amount=amount,
+                )
+            )
+        return clean_transactions

@@ -76,7 +76,7 @@ class CategoryDetails(RetrieveUpdateDestroyAPIView):
 
         if Category.objects.filter(parent=instance).exists():
             raise ValidationError("Cannot delete non empty parent category")
-        if Budget.objects.filter(category=instance.parent or instance).exists():
+        if Budget.objects.filter(category=instance).exists():
             raise ValidationError("Cannot delete category. There are budgets assigned")
         if Transaction.objects.filter(category=instance).exists():
             raise ValidationError(

@@ -1,3 +1,4 @@
+from users.permissions import UserRolePermissions
 from django.contrib.auth import authenticate
 from rest_framework import status
 from rest_framework.authtoken.models import Token
@@ -39,7 +40,9 @@ class UserList(ListAPIView):
         for member in members.values():
             usr = UserSchema(**member)
             try:
-                user_role = UserRole.objects.get(workspace=user.active_workspace, user__uuid=member["uuid"])
+                user_role = UserRole.objects.get(
+                    workspace=user.active_workspace, user__uuid=member["uuid"]
+                )
                 usr.role = user_role.role.name
             except UserRole.DoesNotExist:
                 pass
@@ -103,7 +106,7 @@ class CurrencyView(UpdateAPIView):
 class InviteView(ListCreateAPIView):
     queryset = Invite.objects.all()
     serializer_class = InviteSeriazlier
-    filter_backends = (FilterByUser, FilterByWorkspace)
+    filter_backends = (FilterByWorkspace,)
 
     def list(self, request, *args, **kwargs):
         queryset = self.filter_queryset(self.get_queryset()).filter(
@@ -146,6 +149,7 @@ class RevokeInviteView(DestroyAPIView):
 
 class ChangeUserRoleView(UpdateAPIView):
     serializer_class = ChangeUserRoleSerializer
+    permission_classes = (UserRolePermissions,)
 
     def update(self, request, *args, **kwargs):
         serializer = self.get_serializer(data=request.data)
@@ -164,3 +168,14 @@ class ChangeUserRoleView(UpdateAPIView):
             defaults={"role": target_role},
         )
         return Response(status=status.HTTP_200_OK)
+
+
+class UserPermissions(ListAPIView):
+    def list(self, request, *args, **kwargs):
+        permissions = {
+            "add_user": request.user.has_perm("auth.add_user"),
+            "can_add_account": request.user.has_perm("auth.add_account"),
+            "can_edit_account": request.user.has_perm("auth.update_account"),
+            "can_delete_account": request.user.has_perm("auth.delete_account"),
+        }
+        return Response(permissions)

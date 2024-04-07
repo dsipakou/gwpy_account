@@ -12,4 +12,5 @@ urlpatterns = [
     path(
         "role/<uuid:uuid>/", views.ChangeUserRoleView.as_view(), name="update_user_role"
     ),
+    path("permissions/", views.UserPermissions.as_view(), name="user_permissions"),
 ]

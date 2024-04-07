@@ -1,4 +1,6 @@
 import uuid
+from roles.constants import Roles
+from roles.models import UserRole
 
 from django.contrib.auth.models import AbstractUser
 from django.db import models
@@ -32,6 +34,17 @@ class User(AbstractUser):
 
     def currency_code(self):
         return self.default_currency.code if self.default_currency else None
+
+    def is_owner(self, workspace):
+        return workspace.owner == self
+
+    def is_admin(self, workspace):
+        user_role = UserRole.objects.filter(user=self, workspace=workspace).first()
+        return user_role and user_role.role.name == Roles.ADMIN
+
+    def is_member(self, workspace):
+        user_role = UserRole.objects.filter(user=self, workspace=workspace).first()
+        return user_role and user_role.role.name == Roles.MEMBER
 
     def __str__(self):
         return self.email

@@ -4,31 +4,29 @@ from categories.models import Category
 
 
 class CategorySerializer(serializers.ModelSerializer):
-    test = serializers.BooleanField(required=False)
-
     class Meta:
         model = Category
         fields = (
             "uuid",
+            "icon",
             "name",
             "parent",
             "type",
             "description",
             "created_at",
             "modified_at",
-            "test",
         )
 
-    def validate(self, data):
-        name = data.get("name")
-        parent = data.get("parent")
+    def validate(self, attrs):
+        name = attrs.get("name")
+        parent = attrs.get("parent")
 
-        if parent is None and Category.objects.filter(name=name).exists():
+        if name and parent is None and Category.objects.filter(name=name).exists():
             raise serializers.ValidationError(
                 "Parent category with this name already exists"
             )
 
-        return super().validate(data)
+        return super().validate(attrs)
 
     def create(self, validated_data):
         user = self.context["request"].user

@@ -129,6 +129,7 @@ class BudgetGroupedUsageV2Serializer(serializers.Serializer):
     is_another_month = serializers.BooleanField()
     planned_in_currencies = serializers.DictField()
     spent_in_currencies = serializers.DictField()
+    spent_in_currencies_overall = serializers.DictField()
     items = serializers.ListField(child=BudgetUsageV2Serializer())
 
 

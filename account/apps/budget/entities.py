@@ -1,6 +1,8 @@
 import datetime
 from typing import Dict, List, Optional, TypedDict
 from uuid import UUID, uuid4
+from currencies.models import Currency
+from budget.models import Budget
 
 import pydantic
 
@@ -51,6 +53,7 @@ class BudgetModel(pydantic.BaseModel):
     user: UUID
     category: UUID
     currency: UUID
+    parent_budget: str = ""
     title: str
     budget_date: datetime.date
     transactions: List[BudgetTransactionModel] = pydantic.Field(default_factory=list)
@@ -65,6 +68,37 @@ class BudgetModel(pydantic.BaseModel):
     created_at: datetime.datetime
     modified_at: datetime.datetime
 
+    class Config:
+        from_attributes = True
+
+    @classmethod
+    def init(
+        cls, budget: Budget, available_currencies: List[Currency]
+    ) -> "BudgetModel":
+        return cls(
+            uuid=budget.uuid,
+            user=budget.user.uuid,
+            category=budget.category.uuid,
+            currency=budget.currency.uuid,
+            parent_budget=GroupedBudgetModel.get_grouped_budget_key(budget),
+            title=budget.title,
+            budget_date=budget.budget_date,
+            category_name=budget.category.name,
+            description=budget.description,
+            is_completed=budget.is_completed,
+            recurrent=budget.recurrent,
+            planned=budget.amount,
+            planned_in_currencies={
+                currency["code"]: budget.multicurrency_map.get(currency["code"], 0)
+                for currency in available_currencies
+            },
+            spent_in_currencies={
+                currency["code"]: 0 for currency in available_currencies
+            },
+            created_at=budget.created_at,
+            modified_at=budget.modified_at,
+        )
+
 
 class GroupedBudgetModel(pydantic.BaseModel):
     uuid: UUID = pydantic.Field(default_factory=uuid4)
@@ -77,6 +111,40 @@ class GroupedBudgetModel(pydantic.BaseModel):
     is_another_month: bool = pydantic.Field(default=False)
     planned_in_currencies: dict = pydantic.Field(default_factory=dict)
     spent_in_currencies: dict = pydantic.Field(default_factory=dict)
+    spent_in_currencies_overall: dict = pydantic.Field(default_factory=dict)
+
+    class Config:
+        from_attributes = True
+
+    @staticmethod
+    def get_grouped_budget_key(budget: BudgetModel) -> str:
+        return "_".join(
+            [
+                budget.title,
+                str(budget.category),
+                budget.budget_date.strftime("%Y-%m"),
+            ]
+        )
+
+    @classmethod
+    def init(
+        cls, budget: BudgetModel, available_currencies: List[Currency]
+    ) -> "GroupedBudgetModel":
+        return cls(
+            user=budget.user,
+            category=budget.category,
+            title=budget.title,
+            spent=0,
+            spent_in_currencies={
+                currency["code"]: 0 for currency in available_currencies
+            },
+            planned_in_currencies={
+                currency["code"]: 0 for currency in available_currencies
+            },
+            spent_in_currencies_overall={
+                currency["code"]: 0 for currency in available_currencies
+            },
+        )
 
 
 class BudgetGroupedItem(TypedDict):

@@ -23,9 +23,11 @@ class RateService:
                     "base_currency_id": data["base_currency"],
                 },
             )
+        # Update budgets only from users workspace
         budget_uuids = Budget.objects.filter(
             budget_date=data["rate_date"], workspace=user.active_workspace
         ).values_list("uuid", flat=True)
+        # Update transactions only from users workspace
         transaction_uuids = Transaction.objects.filter(
             transaction_date=data["rate_date"], workspace=user.active_workspace
         ).values_list("uuid", flat=True)

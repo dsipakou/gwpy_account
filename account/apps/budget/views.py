@@ -89,7 +89,7 @@ class MonthlyUsageBudgetList(ListAPIView):
         queryset = self.filter_queryset(self.get_queryset())
 
         categories = BudgetService.load_budget_v2(
-            queryset=queryset,
+            budgets_qs=queryset,
             categories_qs=Category.objects.all(),
             currencies_qs=Currency.objects.filter(
                 workspace=request.user.active_workspace

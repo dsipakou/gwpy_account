@@ -8,7 +8,7 @@ from categories import constants
 
 class Category(models.Model):
     uuid = models.UUIDField(unique=True, default=uuid.uuid4, editable=False)
-    icon = models.CharField(max_length=3, blank=True, null=True)
+    icon = models.CharField(max_length=4, blank=True, null=True)
     name = models.CharField(max_length=128)
     parent = models.ForeignKey(
         "self",

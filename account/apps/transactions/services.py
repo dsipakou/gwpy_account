@@ -243,8 +243,8 @@ class TransactionService:
 
 class ReportService:
     @classmethod
-    def get_year_report(cls, date_from: str, date_to: str, currency_code: str):
-        return Transaction.grouped_by_month(date_from, date_to, currency_code)
+    def get_year_report(cls, date_from: str, date_to: str, currency_code: str, workspace: str):
+        return Transaction.grouped_by_month(date_from, date_to, currency_code, workspace)
 
     @classmethod
     def get_chart_report(

@@ -2,6 +2,7 @@ from datetime import date, datetime, timedelta
 
 from account.apps.transactions.serializers import LastViewedSerializer
 from django.db.models.query import QuerySet
+from django.db import transaction
 from rest_framework import status
 from rest_framework.generics import (
     ListAPIView,
@@ -62,6 +63,7 @@ class TransactionList(ListCreateAPIView):
         serializer = self.get_serializer(transactions, many=True)
         return Response(serializer.data)
 
+    @transaction.atomic
     def create(self, request, *args, **kwargs):
         serializer = TransactionCreateSerializer(data=request.data)
         serializer.is_valid(raise_exception=True)
@@ -148,7 +150,7 @@ class TransactionReportList(ListAPIView):
         date_to = datetime.strptime(request.GET["dateTo"], "%Y-%m-%d")
         date_from = datetime.strptime(request.GET["dateFrom"], "%Y-%m-%d")
         currency_code = request.GET.get("currency")
-        response = ReportService.get_year_report(date_from, date_to, currency_code)
+        response = ReportService.get_year_report(date_from, date_to, currency_code, request.user.active_workspace.uuid)
         serializer = self.get_serializer(response, many=True)
         return Response(serializer.data)
 
@@ -160,7 +162,7 @@ class TransactionReportMonthly(ListAPIView):
 
     def list(self, request, *args, **kwargs):
         qs = self.filter_queryset(self.get_queryset())
-        categories_qs = Category.objects.all()
+        categories_qs = self.filter_queryset(Category.objects.all())
         date_to = datetime.strptime(request.GET["dateTo"], "%Y-%m-%d")
         date_from = datetime.strptime(request.GET["dateFrom"], "%Y-%m-%d")
         currency_code = request.GET.get("currency")

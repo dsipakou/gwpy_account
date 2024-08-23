@@ -4,7 +4,6 @@ import logging
 from typing import Dict, List, Optional
 from uuid import UUID
 
-from account.apps.categories.constants import INCOME
 from dateutil.relativedelta import relativedelta
 from django.db.models import Count, FloatField, Prefetch, Q, QuerySet, Sum, Value
 from django.db.models.fields.json import KeyTextTransform
@@ -85,6 +84,10 @@ class BudgetService:
         date_to: str,
         user: Optional[str],
     ):
+        print("----------------------")
+        print("----- start here -----")
+        print("----------------------")
+        tt = datetime.datetime.now()
         budgets = (
             budgets_qs.filter(budget_date__lte=date_to, budget_date__gte=date_from)
             .select_related("currency", "category", "multicurrency", "user")
@@ -94,7 +97,7 @@ class BudgetService:
             parent__isnull=True, type=constants.EXPENSE
         ).order_by("name")
 
-        available_currencies = currencies_qs.values("code", "is_base")
+        available_currencies = list(currencies_qs.values("code", "is_base"))
         transactions = transactions_qs.filter(
             transaction_date__lte=date_to,
             transaction_date__gte=date_from,
@@ -113,390 +116,196 @@ class BudgetService:
             "category__parent",
             "user",
         )
-
-        """
-        Helper for keeping category uuid -> index map
-        We need it because as output we're expecting a list of grouped categories
-        but in order to get index of any specific category in this list
-        and avoid of list find O(n) operation
-        we will store uuid -> index mapping in index_helper
-        to keep it O(1)
-
-        Example
-
-        {
-            UUID('7b73d927-5f23-4d0f-a4d5-593727e24fb3'): {
-              'index': 0,
-              'items': {}
-            },
-            UUID('b1771ca2-0a8a-4f0a-bdec-d0af56cc022e'): {
-              'index': 1,
-              'items': {}
-            },
-            UUID('3a1c8476-126b-4820-a760-e20a0721edd7'): {
-                'index': 2,
-                'items': {
-                    'category 1 3a1c8476-126b-4820-a760-e20a0721edd7': {
-                        'index': 0,
-                        'items': {
-                            UUID('4c0d91fe-77c1-4e2f-a4d5-00fe3f99a77c'): {'index': 0, 'items': {}}
-                        }
-                    },
-                    'category 2 3a1c8476-126b-4820-a760-e20a0721edd7': {
-                        'index': 1,
-                        'items': {UUID('8fe09547-1df4-429e-8b31-9ec4b7a5c54f'): {'index': 0, 'items': {}}}
-                    }
-                }
-            },
-        }
-        """
-
-        index_helper = {}
-        grouped_categories = []
+        categories_map = {}
 
         date_from_parsed = datetime.datetime.strptime(date_from, "%Y-%m-%d").date()
         date_to_parsed = datetime.datetime.strptime(date_to, "%Y-%m-%d").date()
 
-        # Fill grouped_categories list with empty categories
-        # and index_helper with categories uuid -> index values
+        # Create map of all categories from workspace with minimum data
         for category in parent_categories:
-            if category.uuid not in index_helper:
-                grouped_categories.append(
-                    CategoryModel(
-                        uuid=category.uuid,
-                        category_name=category.name,
-                        spent_in_currencies={
-                            currency["code"]: 0 for currency in available_currencies
-                        },
-                        planned_in_currencies={
-                            currency["code"]: 0 for currency in available_currencies
-                        },
-                    )
-                )
-                index_helper[category.uuid] = {
-                    "index": len(grouped_categories) - 1,
-                    "items": {},
-                }
-
-        # Go through each budget, create grouped budget item if needed in corresponding category.items
-        # and append budget to this grouped budget in
-        # Do the same for index_helper
-        # Budget key is: f'{budget_title}{budget_category_uuid}{current_YYYY_m}'
-        for budget in budgets:
-            category_helper = index_helper[budget.category.uuid]
-            category_item = grouped_categories[category_helper["index"]]
-
-            # title + uuid + year-month uniqueness
-            grouped_budget_key = (
-                budget.title
-                + str(budget.category.uuid)
-                + date_from_parsed.strftime("%Y-%m")
+            categories_map[category.uuid] = CategoryModel.init(
+                category, available_currencies
             )
-            if grouped_budget_key not in category_helper["items"]:
-                category_item.budgets.append(
-                    GroupedBudgetModel(
-                        user=budget.user.uuid,
-                        title=budget.title,
-                        spent_in_currencies={
-                            currency["code"]: 0 for currency in available_currencies
-                        },
-                        planned_in_currencies={
-                            currency["code"]: 0 for currency in available_currencies
-                        },
-                        spent_in_currencies_overall={
-                            currency["code"]: 0 for currency in available_currencies
-                        },
-                    )
-                )
-                category_helper["items"][grouped_budget_key] = {
-                    "index": len(category_item.budgets) - 1,
-                    "items": {},
-                }
-            grouped_budget_helper = category_helper["items"][grouped_budget_key]
-            grouped_budget_item = category_item.budgets[grouped_budget_helper["index"]]
 
-            if budget.uuid not in grouped_budget_helper["items"]:
-                grouped_budget_item.items.append(
-                    BudgetModel(
-                        uuid=budget.uuid,
-                        user=budget.user.uuid,
-                        category=budget.category.uuid,
-                        currency=budget.currency.uuid,
-                        title=budget.title,
-                        budget_date=budget.budget_date,
-                        category_name=budget.category.name,
-                        description=budget.description,
-                        is_completed=budget.is_completed,
-                        recurrent=budget.recurrent,
-                        planned=budget.amount,
-                        planned_in_currencies={
-                            currency["code"]: budget.multicurrency_map.get(
-                                currency["code"], 0
-                            )
-                            for currency in available_currencies
-                        },
-                        spent_in_currencies={
-                            currency["code"]: 0 for currency in available_currencies
-                        },
-                        created_at=budget.created_at,
-                        modified_at=budget.modified_at,
-                    )
+        print("---------------------")
+        print("---- Category create ---")
+        print("---------------------")
+        print(datetime.datetime.now() - tt)
+
+        # Create grouped budgets with budgets inside for corresponding categories
+        # Counting only planned values here
+        for budget in budgets:
+            category_for_budget = categories_map[budget.category.uuid]
+
+            transaction_budget_group_key = GroupedBudgetModel.get_grouped_budget_key(
+                budget
+            )
+
+            # If this budget group isn't exists yet in this category - create it
+            if transaction_budget_group_key not in category_for_budget.budgets_map:
+                category_for_budget.budgets_map[
+                    transaction_budget_group_key
+                ] = GroupedBudgetModel.init(
+                    budget,
+                    available_currencies,
                 )
 
-                grouped_budget_helper["items"][budget.uuid] = {
-                    "index": len(grouped_budget_item.items) - 1,
-                    "items": {},
-                }
+            budget_group_item = category_for_budget.budgets_map[
+                transaction_budget_group_key
+            ]
 
-                category_helper = index_helper[budget.category.uuid]
-                category_item = grouped_categories[category_helper["index"]]
+            # Add budget to budget group
+            budget_group_item.items_map[budget.uuid] = BudgetModel.init(
+                budget,
+                available_currencies,
+            )
 
-                grouped_budget_item.spent = 0
-                category_item.spent = 0
-                grouped_budget_item.planned += budget.amount
-                category_item.planned += budget.amount
+            # Increase planned values with real budget value
+            # TODO: remove this since this value are obsolete
+            budget_group_item.planned += budget.amount
+            category_for_budget.planned += budget.amount
 
-                for currency in available_currencies:
-                    grouped_budget_item.spent_in_currencies[currency["code"]] = 0
-                    category_item.spent_in_currencies[currency["code"]] = 0
-                    grouped_budget_item.planned_in_currencies[
-                        currency["code"]
-                    ] = grouped_budget_item.planned_in_currencies.get(
-                        currency["code"], 0
-                    ) + budget.multicurrency_map.get(
-                        currency["code"], 0
-                    )
-                    category_item.planned_in_currencies[
-                        currency["code"]
-                    ] = category_item.planned_in_currencies.get(
-                        currency["code"], 0
-                    ) + budget.multicurrency_map.get(
-                        currency["code"], 0
-                    )
+            budget_group_item.update_planned_values(
+                available_currencies, budget.multicurrency_map
+            )
+            category_for_budget.update_planned_values(
+                available_currencies, budget.multicurrency_map
+            )
+
+        print("---------------------")
+        print("---- Budget create ---")
+        print("---------------------")
+        print(datetime.datetime.now() - tt)
 
         # Fill in budgets spendings
         for transaction in transactions:
             # Prepare transaction model
-            transaction_model = BudgetTransactionModel(
-                uuid=transaction.uuid,
-                user=transaction.user.uuid,
-                currency=transaction.currency.uuid,
-                currency_code=transaction.currency.code,
-                spent=transaction.amount,
-                transaction_date=transaction.transaction_date,
-                spent_in_currencies=transaction.multicurrency_map.copy(),
+            transaction_model = BudgetTransactionModel.init(transaction)
+
+            transaction_budget = transaction.budget
+            transaction_budget_group_key = GroupedBudgetModel.get_grouped_budget_key(
+                transaction_budget
             )
 
-            # We need to find transaction's parent category in grouped_categories list
-            # if for some reason it's not in place - create it
-            parent_category = transaction.category.parent
-            if parent_category.uuid not in index_helper:
-                grouped_categories.append(
-                    CategoryModel(
-                        uuid=parent_category.uuid,
-                        category_name=parent_category.name,
-                    )
-                )
-                index_helper[parent_category.uuid] = {
-                    "index": len(grouped_categories) - 1,
-                    "items": {},
-                }
-
-            budget = transaction.budget
-
-            # Also we need to find budget's parent category in grouped_categories
-            # in case if budget was planned for one category, but actual transaction
-            # was added for another
-            budget_parent_category = budget.category
-            if parent_category.uuid not in index_helper:
-                grouped_categories.append(
-                    CategoryModel(
-                        uuid=budget_parent_category.uuid,
-                        category_name=budget_parent_category.name,
-                    )
-                )
-                index_helper[budget_parent_category.uuid] = {
-                    "index": len(grouped_categories) - 1,
-                    "items": {},
-                }
+            # Actual transaction category might differ from budget category
+            transaction_category = transaction.category.parent
 
             # TODO: make a migration to rid off nullable budgets
             # Legacy support when transaction can be without a budget
-            if not budget:
+            if not transaction_budget:
                 continue
 
-            category_helper = index_helper[parent_category.uuid]
-            category_item = grouped_categories[category_helper["index"]]
-            budget_category_helper = index_helper[budget_parent_category.uuid]
-            budget_category_item = grouped_categories[budget_category_helper["index"]]
+            transaction_category_object = categories_map[transaction_category.uuid]
 
-            category_item.spent += transaction.amount
-
-            for currency in available_currencies:
-                category_item.spent_in_currencies[currency["code"]] = round(
-                    category_item.spent_in_currencies.get(currency["code"], 0)
-                    + transaction.multicurrency_map.get(currency["code"], 0),
-                    4,
-                )
+            # TODO: Remove this
+            transaction_category_object.spent += transaction.amount
+            transaction_category_object.update_spent_values(
+                available_currencies, transaction.multicurrency_map
+            )
 
             # Find or append budget group to category
             # title + uuid + year-month uniqueness
-            grouped_budget_key = (
-                budget.title
-                + str(budget.category.uuid)
-                + budget.budget_date.strftime("%Y-%m")
+            if (
+                transaction_budget_group_key
+                not in transaction_category_object.budgets_map
+            ):
+                transaction_category_object.budgets_map[
+                    transaction_budget_group_key
+                ] = GroupedBudgetModel.build_for_transaction(
+                    transaction_budget,
+                    transaction_category_object,
+                    date_from_parsed,
+                    date_to_parsed,
+                    available_currencies,
+                )
+
+            budget_group_item = transaction_category_object.budgets_map[
+                transaction_budget_group_key
+            ]
+
+            budget_group_item.spent += transaction.amount
+            budget_group_item.update_spent_values(
+                available_currencies, transaction.multicurrency_map
             )
-            if grouped_budget_key not in category_helper["items"]:
-                category_item.budgets.append(
-                    GroupedBudgetModel(
-                        user=budget.user.uuid,
-                        title=budget.title,
-                        is_another_category=category_item.uuid != budget.category.uuid,
-                        is_another_month=budget.budget_date < date_from_parsed
-                        or budget.budget_date > date_to_parsed,
-                        planned=0,
-                        planned_in_currencies={
-                            currency["code"]: 0 for currency in available_currencies
-                        },
-                    )
-                )
-                category_helper["items"][grouped_budget_key] = {
-                    "index": len(category_item.budgets) - 1,
-                    "items": {},
-                }
-
-            if grouped_budget_key not in budget_category_helper["items"]:
-                budget_category_item.budgets.append(
-                    GroupedBudgetModel(
-                        user=budget.user.uuid,
-                        title=budget.title,
-                        is_another_category=category_item.uuid != budget.category.uuid,
-                        is_another_month=budget.budget_date < date_from_parsed
-                        or budget.budget_date > date_to_parsed,
-                        planned=0,
-                        planned_in_currencies={
-                            currency["code"]: 0 for currency in available_currencies
-                        },
-                    )
-                )
-                budget_category_helper["items"][grouped_budget_key] = {
-                    "index": len(budget_category_item.budgets) - 1,
-                    "items": {},
-                }
-            grouped_budget_helper = category_helper["items"][grouped_budget_key]
-            grouped_budget_item = category_item.budgets[grouped_budget_helper["index"]]
-            budget_grouped_budget_helper = budget_category_helper["items"][
-                grouped_budget_key
-            ]
-            budget_grouped_budget_item = budget_category_item.budgets[
-                budget_grouped_budget_helper["index"]
-            ]
-
-            grouped_budget_item.spent += transaction.amount
-
-            for currency in available_currencies:
-                grouped_budget_item.spent_in_currencies[
-                    currency["code"]
-                ] = grouped_budget_item.spent_in_currencies.get(
-                    currency["code"], 0
-                ) + transaction.multicurrency_map.get(
-                    currency["code"], 0
-                )
-                grouped_budget_item.spent_in_currencies_overall[
-                    currency["code"]
-                ] = grouped_budget_item.spent_in_currencies_overall.get(
-                    currency["code"], 0
-                ) + transaction.multicurrency_map.get(
-                    currency["code"], 0
-                )
-                if parent_category != budget_parent_category:
-                    budget_grouped_budget_item.spent_in_currencies_overall[
-                        currency["code"]
-                    ] = budget_grouped_budget_item.spent_in_currencies_overall.get(
-                        currency["code"], 0
-                    ) + transaction.multicurrency_map.get(
-                        currency["code"], 0
-                    )
+            budget_group_item.update_spent_overall_values(
+                available_currencies, transaction.multicurrency_map
+            )
 
             # Find or append budget to budget group
-            if budget.uuid not in grouped_budget_helper["items"]:
-                grouped_budget_item.items.append(
-                    BudgetModel(
-                        uuid=budget.uuid,
-                        user=budget.user.uuid,
-                        category=budget.category.uuid,
-                        currency=budget.currency.uuid,
-                        title=budget.title,
-                        budget_date=budget.budget_date,
-                        category_name=budget.category.name,
-                        description=budget.description,
-                        is_completed=budget.is_completed,
-                        recurrent=budget.recurrent,
-                        created_at=budget.created_at,
-                        modified_at=budget.modified_at,
-                        planned=0,
-                        planned_in_currencies={
-                            currency["code"]: 0 for currency in available_currencies
-                        },
+            if transaction_budget.uuid not in budget_group_item.items_map:
+                budget_group_item.items_map[
+                    transaction_budget.uuid
+                ] = BudgetModel.init_for_transaction(
+                    transaction_budget, available_currencies
+                )
+
+            simple_budget_item = budget_group_item.items_map[transaction_budget.uuid]
+
+            simple_budget_item.spent += transaction.amount
+            simple_budget_item.update_spent_values(
+                available_currencies, transaction.multicurrency_map
+            )
+            simple_budget_item.transactions.append(transaction_model)
+
+            # Logic when transaction and budget categories are no the same
+            transaction_budget_category = transaction_budget.category
+            if transaction_category != transaction_budget_category:
+                transaction_budget_category_object = categories_map[
+                    transaction_budget_category.uuid
+                ]
+                if (
+                    transaction_budget_group_key
+                    not in transaction_budget_category_object.budgets_map
+                ):
+                    transaction_budget_category_object.budgets_map[
+                        transaction_budget_group_key
+                    ] = GroupedBudgetModel.build_for_transaction(
+                        transaction_budget,
+                        transaction_category_object,
+                        date_from_parsed,
+                        date_to_parsed,
+                        available_currencies,
                     )
+                simple_budget_grouped_budget_item = (
+                    transaction_budget_category_object.budgets_map[
+                        transaction_budget_group_key
+                    ]
                 )
-
-                grouped_budget_helper["items"][budget.uuid] = {
-                    "index": len(grouped_budget_item.items) - 1,
-                    "items": {},
-                }
-            if (
-                parent_category != budget_parent_category
-                and budget.uuid not in budget_grouped_budget_helper["items"]
-            ):
-                budget_grouped_budget_item.items.append(
-                    BudgetModel(
-                        uuid=budget.uuid,
-                        user=budget.user.uuid,
-                        category=budget.category.uuid,
-                        currency=budget.currency.uuid,
-                        title=budget.title,
-                        budget_date=budget.budget_date,
-                        category_name=budget.category.name,
-                        description=budget.description,
-                        is_completed=budget.is_completed,
-                        recurrent=budget.recurrent,
-                        created_at=budget.created_at,
-                        modified_at=budget.modified_at,
-                        planned=0,
-                        planned_in_currencies={
-                            currency["code"]: 0 for currency in available_currencies
-                        },
+                simple_budget_grouped_budget_item.update_spent_overall_values(
+                    available_currencies, transaction.multicurrency_map
+                )
+                if (
+                    transaction_budget.uuid
+                    not in simple_budget_grouped_budget_item.items_map
+                ):
+                    simple_budget_grouped_budget_item.items_map[
+                        transaction_budget.uuid
+                    ] = BudgetModel.init_for_transaction(
+                        transaction_budget, available_currencies
                     )
-                )
+                simple_budget_budget_item = simple_budget_grouped_budget_item.items_map[
+                    transaction_budget.uuid
+                ]
+                if transaction_category != transaction_budget_category:
+                    simple_budget_budget_item.transactions.append(transaction_model)
 
-                budget_grouped_budget_helper["items"][budget.uuid] = {
-                    "index": len(budget_grouped_budget_item.items) - 1,
-                    "items": {},
-                }
+        print("---------------------")
+        print("---- Transaction create ---")
+        print("---------------------")
+        print(datetime.datetime.now() - tt)
 
-            budget_helper = grouped_budget_helper["items"][budget.uuid]
-            budget_item = grouped_budget_item.items[budget_helper["index"]]
-            budget_budget_helper = budget_grouped_budget_helper["items"][budget.uuid]
-            budget_budget_item = budget_grouped_budget_item.items[
-                budget_budget_helper["index"]
-            ]
+        # Prepare output list
+        output = [category for category in categories_map.values()]
+        for cat in output:
+            cat.budgets = [val for val in cat.budgets_map.values()]
+            for bud in cat.budgets:
+                bud.items = [val for val in bud.items_map.values()]
 
-            budget_item.spent += transaction.amount
-            budget_item.transactions.append(transaction_model)
-            if parent_category != budget_parent_category:
-                budget_budget_item.transactions.append(transaction_model)
-
-            for currency in available_currencies:
-                budget_item.spent_in_currencies[
-                    currency["code"]
-                ] = budget_item.spent_in_currencies.get(
-                    currency["code"], 0
-                ) + transaction.multicurrency_map.get(
-                    currency["code"], 0
-                )
-
-        return [item.dict() for item in grouped_categories]
+        print("---------------------")
+        print("---- End  ---")
+        print("---------------------")
+        print(datetime.datetime.now() - tt)
+        return [item.dict() for item in output]
 
     @classmethod
     def load_budget(
@@ -529,7 +338,7 @@ class BudgetService:
 
         category_budgets_prefetch = Prefetch(
             "budget_set",
-            queryset=budgets.all(),
+            queryset=budgets.filter(workspace=user.active_workspace),
             to_attr="budgets",
         )
         categories = (

@@ -66,7 +66,7 @@ class Transaction(models.Model):
         )
 
     @classmethod
-    def grouped_by_month(cls, date_from, date_to, currency_code):
+    def grouped_by_month(cls, date_from, date_to, currency_code, workspace):
         raw_sql = textwrap.dedent(
             """
             SELECT
@@ -93,6 +93,7 @@ class Transaction(models.Model):
                     LEFT JOIN rates_rate r ON r.currency_id = t.currency_id AND r.rate_date = t.transaction_date
                     LEFT JOIN currencies_currency c ON c.uuid = t.currency_id
                     LEFT JOIN categories_category cc on cc.uuid = t.category_id
+                WHERE t.workspace_id = %s
                 GROUP BY t.transaction_date, cc.type
                 HAVING t.transaction_date >= %s AND t.transaction_date <= %s AND cc.type = %s
                 ORDER BY t.transaction_date
@@ -104,7 +105,7 @@ class Transaction(models.Model):
         )
         with connection.cursor() as cursor:
             cursor.execute(
-                raw_sql, [date_from, date_to, category_constants.EXPENSE, currency_code]
+                raw_sql, [str(workspace), date_from, date_to, category_constants.EXPENSE, currency_code]
             )
             grouped_transactions = dictfetchall(cursor)
 

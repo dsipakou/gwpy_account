@@ -1,16 +1,16 @@
 from budget.models import Budget
+from django.db import transaction
 from budget.services import BudgetService
-from currencies.models import Currency
 from rates.entities import BatchedRateRequest
 from rates.models import Rate
 from transactions.models import Transaction
 from transactions.services import TransactionService
 from users.models import User
-from workspaces.models import Workspace
 
 
 class RateService:
     @classmethod
+    @transaction.atomic
     def create_batched_rates(cls, data: BatchedRateRequest):
         user = User.objects.get(uuid=data["user"])
         for item in data["items"]:

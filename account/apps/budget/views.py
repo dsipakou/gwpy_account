@@ -69,7 +69,8 @@ class BudgetDetails(RetrieveUpdateDestroyAPIView):
             ValidationError: when category is not parent category
         """
 
-        if serializer.validated_data["category"].parent is not None:
+        category = serializer.validated_data.get("category")
+        if category and category.parent is not None:
             raise ValidationError("Only parent categories can be used for budgets.")
         instance = serializer.save()
         BudgetService.create_budget_multicurrency_amount(
@@ -90,7 +91,7 @@ class MonthlyUsageBudgetList(ListAPIView):
 
         categories = BudgetService.load_budget_v2(
             budgets_qs=queryset,
-            categories_qs=Category.objects.all(),
+            categories_qs=Category.objects.filter(workspace=request.user.active_workspace),
             currencies_qs=Currency.objects.filter(
                 workspace=request.user.active_workspace
             ),

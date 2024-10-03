@@ -112,6 +112,24 @@ class TransactionDetailsSerializer(serializers.ModelSerializer):
         )
 
 
+class TransactionUpdateSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = Transaction
+        fields = (
+            "uuid",
+            "user",
+            "category",
+            "budget",
+            "currency",
+            "amount",
+            "account",
+            "description",
+            "transaction_date",
+            "created_at",
+            "modified_at",
+        )
+
+
 class ReportByMonthSerializer(serializers.Serializer):
     month = serializers.CharField()
     day = serializers.IntegerField()

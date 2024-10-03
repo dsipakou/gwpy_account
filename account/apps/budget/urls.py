@@ -18,4 +18,5 @@ urlpatterns = [
         views.LastMonthsBudgetUsageList.as_view(),
         name="last_months_sum",
     ),
+    path("upcomming/", views.UpcomingBudgetList.as_view(), name="upcoming_budget"),
 ]

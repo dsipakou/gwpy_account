@@ -7,7 +7,9 @@ from rest_framework import status
 from rest_framework.generics import (
     ListAPIView,
     ListCreateAPIView,
-    RetrieveUpdateDestroyAPIView,
+    RetrieveDestroyAPIView,
+    UpdateAPIView,
+    DestroyAPIView,
 )
 from rest_framework.response import Response
 
@@ -22,13 +24,14 @@ from transactions.serializers import (
     TransactionCreateSerializer,
     TransactionDetailsSerializer,
     TransactionSerializer,
+    TransactionUpdateSerializer,
 )
 from transactions.services import ReportService, TransactionService
 from users.filters import FilterByUser
 from workspaces.filters import FilterByWorkspace
 
 
-class TransactionList(ListCreateAPIView):
+class TransactionList(ListCreateAPIView, UpdateAPIView):
     queryset = Transaction.objects.all()
     serializer_class = TransactionSerializer
     filter_backends = (FilterByUser, FilterByWorkspace)
@@ -75,11 +78,28 @@ class TransactionList(ListCreateAPIView):
             [instance.uuid], workspace=workspace
         )
         transaction = TransactionService.load_transaction(instance.uuid)
-        serializer = self.get_serializer(transaction)
+        serializer = TransactionSerializer(transaction)
         return Response(
             serializer.data, status=status.HTTP_201_CREATED, headers=headers
         )
 
+    def get_existing_object(self):
+        return Transaction.objects.get(uuid=self.request.data["uuid"], workspace=self.request.user.active_workspace)
+
+    @transaction.atomic
+    def update(self, request, *args, **kwargs):
+        instance = self.get_existing_object()
+        serializer = TransactionUpdateSerializer(instance, data=request.data, partial=True)
+        serializer.is_valid(raise_exception=True)
+        workspace = request.user.active_workspace
+        self.perform_update(serializer)
+        TransactionService.create_transaction_multicurrency_amount(
+            [instance.uuid], workspace=workspace
+        )
+        transaction = TransactionService.load_transaction(instance.uuid)
+        serializer = TransactionSerializer(transaction)
+
+        return Response(serializer.data, status=status.HTTP_200_OK)
 
 class BudgetTransactions(ListAPIView):
     filter_backends = (FilterByUser, FilterByWorkspace)
@@ -108,22 +128,11 @@ class BudgetTransactions(ListAPIView):
         return Response(serializer.data)
 
 
-class TransactionDetails(RetrieveUpdateDestroyAPIView):
+class TransactionDetails(RetrieveDestroyAPIView):
     queryset = Transaction.objects.all()
     serializer_class = TransactionDetailsSerializer
     filter_backends = (FilterByUser, FilterByWorkspace)
     lookup_field = "uuid"
-
-    def update(self, request, *args, **kwargs):
-        instance = self.get_object()
-        workspace = request.user.active_workspace
-        serializer = self.get_serializer(instance, data=request.data, partial=True)
-        serializer.is_valid(raise_exception=True)
-        self.perform_update(serializer)
-        TransactionService.create_transaction_multicurrency_amount(
-            [instance.uuid], workspace=workspace
-        )
-        return Response(serializer.data, status=status.HTTP_200_OK)
 
 
 class TransactionGroupedList(ListAPIView):

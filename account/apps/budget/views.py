@@ -132,6 +132,18 @@ class WeeklyUsageList(ListAPIView):
         return Response(serializer.data)
 
 
+class UpcomingBudgetList(ListAPIView):
+    queryset = Budget.objects.filter(budget_date__gte=datetime.date.today(), is_completed=False)
+    filter_backends = (FilterByUser, FilterByWorkspace)
+    serializer_class = serializers.BudgetSerializer
+
+    def list(self, request, *args, **kwargs):
+        queryset = self.filter_queryset(self.get_queryset()).order_by("budget_date")
+        limit = request.query_params.get("limit", 6)
+        serializer = self.get_serializer(queryset[:limit], many=True)
+        return Response(serializer.data)
+
+
 class DuplicateBudgetView(GenericAPIView):
     queryset = Budget.objects.all()
     filter_backends = (FilterByUser, FilterByWorkspace)

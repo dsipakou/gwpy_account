@@ -25,6 +25,11 @@ urlpatterns = [
         name="budget_transactions",
     ),
     path(
+        "category/<uuid:uuid>/",
+        views.CategoryTransactions.as_view(),
+        name="category_transactions",
+    ),
+    path(
         "last-added/",
         views.TransactionsLastAddedView.as_view(),
         name="transactions_last_added",

@@ -1,34 +1,29 @@
+import time
 from datetime import date, datetime, timedelta
-
-from account.apps.transactions.serializers import LastViewedSerializer
-from django.db.models.query import QuerySet
-from django.db import transaction
-from rest_framework import status
-from rest_framework.generics import (
-    ListAPIView,
-    ListCreateAPIView,
-    RetrieveDestroyAPIView,
-    UpdateAPIView,
-    DestroyAPIView,
-)
-from rest_framework.response import Response
 
 from categories import constants
 from categories.models import Category
+from django.db import transaction
+from django.db.models.query import QuerySet
+from rest_framework import status
+from rest_framework.generics import (DestroyAPIView, ListAPIView,
+                                     ListCreateAPIView, RetrieveDestroyAPIView,
+                                     UpdateAPIView)
+from rest_framework.response import Response
 from transactions.models import LastViewed, Transaction
-from transactions.serializers import (
-    GroupedTransactionSerializer,
-    IncomeSerializer,
-    ReportByMonthSerializer,
-    ReportChartSerializer,
-    TransactionCreateSerializer,
-    TransactionDetailsSerializer,
-    TransactionSerializer,
-    TransactionUpdateSerializer,
-)
+from transactions.serializers import (GroupedTransactionSerializer,
+                                      IncomeSerializer,
+                                      ReportByMonthSerializer,
+                                      ReportChartSerializer,
+                                      TransactionCreateSerializer,
+                                      TransactionDetailsSerializer,
+                                      TransactionSerializer,
+                                      TransactionUpdateSerializer)
 from transactions.services import ReportService, TransactionService
 from users.filters import FilterByUser
 from workspaces.filters import FilterByWorkspace
+
+from account.apps.transactions.serializers import LastViewedSerializer
 
 
 class TransactionList(ListCreateAPIView, UpdateAPIView):
@@ -84,12 +79,16 @@ class TransactionList(ListCreateAPIView, UpdateAPIView):
         )
 
     def get_existing_object(self):
-        return Transaction.objects.get(uuid=self.request.data["uuid"], workspace=self.request.user.active_workspace)
+        return Transaction.objects.get(
+            uuid=self.request.data["uuid"], workspace=self.request.user.active_workspace
+        )
 
     @transaction.atomic
     def update(self, request, *args, **kwargs):
         instance = self.get_existing_object()
-        serializer = TransactionUpdateSerializer(instance, data=request.data, partial=True)
+        serializer = TransactionUpdateSerializer(
+            instance, data=request.data, partial=True
+        )
         serializer.is_valid(raise_exception=True)
         workspace = request.user.active_workspace
         self.perform_update(serializer)
@@ -100,6 +99,7 @@ class TransactionList(ListCreateAPIView, UpdateAPIView):
         serializer = TransactionSerializer(transaction)
 
         return Response(serializer.data, status=status.HTTP_200_OK)
+
 
 class BudgetTransactions(ListAPIView):
     filter_backends = (FilterByUser, FilterByWorkspace)
@@ -125,6 +125,33 @@ class BudgetTransactions(ListAPIView):
             self.filter_queryset(self.get_queryset())
         )
         serializer = self.get_serializer(transactions, many=True)
+        return Response(serializer.data)
+
+
+class CategoryTransactions(ListAPIView):
+    filter_backends = (FilterByUser, FilterByWorkspace)
+    serializer_class = TransactionSerializer
+
+    def get_queryset(self) -> QuerySet:
+        return (
+            Transaction.objects.filter(category__uuid=self.kwargs["uuid"])
+            .select_related(
+                "account",
+                "budget",
+                "category",
+                "category__parent",
+                "currency",
+                "multicurrency",
+                "user",
+            )
+            .order_by("-transaction_date")
+        )
+
+    def list(self, request, *args, **kwargs):
+        transactions = TransactionService.proceed_transactions(
+            self.filter_queryset(self.get_queryset())
+        )
+        serializer = self.get_serializer(transactions[:20], many=True)
         return Response(serializer.data)
 
 
@@ -159,7 +186,9 @@ class TransactionReportList(ListAPIView):
         date_to = datetime.strptime(request.GET["dateTo"], "%Y-%m-%d")
         date_from = datetime.strptime(request.GET["dateFrom"], "%Y-%m-%d")
         currency_code = request.GET.get("currency")
-        response = ReportService.get_year_report(date_from, date_to, currency_code, request.user.active_workspace.uuid)
+        response = ReportService.get_year_report(
+            date_from, date_to, currency_code, request.user.active_workspace.uuid
+        )
         serializer = self.get_serializer(response, many=True)
         return Response(serializer.data)
 

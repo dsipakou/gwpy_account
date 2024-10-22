@@ -1,21 +1,17 @@
 import datetime
 
-from rest_framework import status
-from rest_framework.exceptions import ValidationError
-from rest_framework.generics import (
-    GenericAPIView,
-    ListAPIView,
-    ListCreateAPIView,
-    RetrieveUpdateDestroyAPIView,
-)
-from rest_framework.response import Response
-
 from budget import serializers
 from budget.models import Budget
 from budget.serializers import DuplicateResponseSerializer
 from budget.services import BudgetService
 from categories.models import Category
 from currencies.models import Currency
+from rest_framework import status
+from rest_framework.exceptions import ValidationError
+from rest_framework.generics import (GenericAPIView, ListAPIView,
+                                     ListCreateAPIView,
+                                     RetrieveUpdateDestroyAPIView)
+from rest_framework.response import Response
 from transactions.models import Transaction
 from users.filters import FilterByUser
 from users.permissions import BaseUserPermission
@@ -91,7 +87,9 @@ class MonthlyUsageBudgetList(ListAPIView):
 
         categories = BudgetService.load_budget_v2(
             budgets_qs=queryset,
-            categories_qs=Category.objects.filter(workspace=request.user.active_workspace),
+            categories_qs=Category.objects.filter(
+                workspace=request.user.active_workspace
+            ),
             currencies_qs=Currency.objects.filter(
                 workspace=request.user.active_workspace
             ),
@@ -133,12 +131,16 @@ class WeeklyUsageList(ListAPIView):
 
 
 class UpcomingBudgetList(ListAPIView):
-    queryset = Budget.objects.filter(budget_date__gte=datetime.date.today(), is_completed=False)
+    queryset = Budget.objects.all()
     filter_backends = (FilterByUser, FilterByWorkspace)
     serializer_class = serializers.BudgetSerializer
 
     def list(self, request, *args, **kwargs):
-        queryset = self.filter_queryset(self.get_queryset()).order_by("budget_date")
+        queryset = (
+            self.filter_queryset(self.get_queryset())
+            .filter(budget_date__gte=datetime.date.today(), is_completed=False)
+            .order_by("budget_date")
+        )
         limit = request.query_params.get("limit", 6)
         serializer = self.get_serializer(queryset[:limit], many=True)
         return Response(serializer.data)

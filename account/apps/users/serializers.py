@@ -39,6 +39,11 @@ class ChangeUserRoleSerializer(serializers.Serializer):
     role = serializers.CharField()
 
 
+class ChangePasswordSerializer(serializers.Serializer):
+    old_password = serializers.CharField()
+    new_password = serializers.CharField()
+
+
 class InviteRequestSerializer(serializers.ModelSerializer):
     class Meta:
         model = Invite

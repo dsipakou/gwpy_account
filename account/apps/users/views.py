@@ -20,6 +20,7 @@ from users.models import Invite, User
 from users.serializers import (
     ChangeDefaultCurrencySerializer,
     ChangeUserRoleSerializer,
+    ChangePasswordSerializer,
     InviteRequestSerializer,
     InviteSeriazlier,
     RegisterSerializer,
@@ -168,6 +169,22 @@ class ChangeUserRoleView(UpdateAPIView):
             defaults={"role": target_role},
         )
         return Response(status=status.HTTP_200_OK)
+
+
+class ChangePasswordView(UpdateAPIView):
+    serializer_class = ChangePasswordSerializer
+
+    def update(self, request, *args, **kwargs):
+        serializer = self.get_serializer(data=request.data)
+        serializer.is_valid(raise_exception=True)
+        user = request.user
+
+        if user.check_password(serializer.validated_data["old_password"]):
+            user.set_password(serializer.validated_data["new_password"])
+            user.save()
+            return Response(status=status.HTTP_200_OK)
+        else:
+            return Response("Your current password is incorrect", status=status.HTTP_400_BAD_REQUEST)
 
 
 class UserPermissions(ListAPIView):

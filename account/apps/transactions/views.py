@@ -1,24 +1,31 @@
-import time
+import functools
 from datetime import date, datetime, timedelta
 
 from categories import constants
 from categories.models import Category
 from django.db import transaction
 from django.db.models.query import QuerySet
+from django.utils.timezone import now
 from rest_framework import status
-from rest_framework.generics import (DestroyAPIView, ListAPIView,
-                                     ListCreateAPIView, RetrieveDestroyAPIView,
-                                     UpdateAPIView)
+from rest_framework.generics import (
+    ListAPIView,
+    ListCreateAPIView,
+    RetrieveDestroyAPIView,
+    UpdateAPIView,
+)
 from rest_framework.response import Response
 from transactions.models import LastViewed, Transaction
-from transactions.serializers import (GroupedTransactionSerializer,
-                                      IncomeSerializer,
-                                      ReportByMonthSerializer,
-                                      ReportChartSerializer,
-                                      TransactionCreateSerializer,
-                                      TransactionDetailsSerializer,
-                                      TransactionSerializer,
-                                      TransactionUpdateSerializer)
+from transactions.serializers import (
+    GroupedTransactionSerializer,
+    AccountUsageSerializer,
+    IncomeSerializer,
+    ReportByMonthSerializer,
+    ReportChartSerializer,
+    TransactionCreateSerializer,
+    TransactionDetailsSerializer,
+    TransactionSerializer,
+    TransactionUpdateSerializer,
+)
 from transactions.services import ReportService, TransactionService
 from users.filters import FilterByUser
 from workspaces.filters import FilterByWorkspace
@@ -125,6 +132,67 @@ class BudgetTransactions(ListAPIView):
             self.filter_queryset(self.get_queryset())
         )
         serializer = self.get_serializer(transactions, many=True)
+        return Response(serializer.data)
+
+
+class AccountUsage(ListAPIView):
+    filter_backends = (FilterByUser, FilterByWorkspace)
+    serializer_class = AccountUsageSerializer
+
+    def get_queryset(self) -> QuerySet:
+        start_of_month = now().replace(day=1)
+
+        return (
+            Transaction.objects.filter(
+                account__uuid=self.kwargs["uuid"],
+                transaction_date__gte=start_of_month,
+            )
+            .select_related(
+                "account",
+                "budget",
+                "category",
+                "category__parent",
+                "currency",
+                "multicurrency",
+                "user",
+            )
+            .order_by("-transaction_date")
+        )
+
+    def list(self, request, *args, **kwargs):
+        spent_transactions = TransactionService.proceed_transactions(
+            self.filter_queryset(
+                self.get_queryset().filter(category__type=constants.EXPENSE)
+            )
+        )
+        income_transactions = TransactionService.proceed_transactions(
+            self.filter_queryset(
+                self.get_queryset().filter(category__type=constants.INCOME)
+            )
+        )
+        default_currency = request.user.default_currency
+        spent_sum = functools.reduce(
+            lambda x, y: x + y,
+            [
+                t["spent_in_currencies"].get(default_currency.code, 0)
+                for t in spent_transactions
+            ],
+            0,
+        )
+        income_sum = functools.reduce(
+            lambda x, y: x + y,
+            [
+                t["spent_in_currencies"].get(default_currency.code, 0)
+                for t in income_transactions
+            ],
+            0,
+        )
+        serializer = AccountUsageSerializer(
+            {
+                "spent": round(spent_sum, 2),
+                "income": round(income_sum, 2),
+            }
+        )
         return Response(serializer.data)
 
 

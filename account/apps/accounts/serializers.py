@@ -5,6 +5,8 @@ from .models import Account
 
 
 class AccountSerializer(serializers.ModelSerializer):
+    usage = serializers.ListField(read_only=True)
+
     class Meta:
         model = Account
         fields = (
@@ -14,6 +16,7 @@ class AccountSerializer(serializers.ModelSerializer):
             "category",
             "description",
             "is_main",
+            "usage",
             "created_at",
             "modified_at",
         )

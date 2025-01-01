@@ -1,3 +1,9 @@
+from datetime import date, timedelta
+from account.apps.categories.constants import EXPENSE, INCOME
+from dateutil.relativedelta import relativedelta
+from django.db.models import Sum, FloatField, Sum, Value, Q
+from django.db.models.fields.json import KeyTextTransform
+from django.db.models.functions import Cast, Coalesce, TruncMonth
 from rest_framework import status
 from rest_framework.generics import (
     CreateAPIView,
@@ -39,6 +45,57 @@ class AccountDetails(RetrieveUpdateDestroyAPIView):
 
         self.perform_destroy(instance)
         return Response(status=status.HTTP_204_NO_CONTENT)
+
+    def retrieve(self, request, *args, **kwargs):
+        today = date.today()
+        start_date = (
+            (today.replace(day=1) - timedelta(days=1)) - relativedelta(months=2)
+        ).replace(day=1)
+        end_date = today.replace(day=1)
+
+        currency_code = request.user.currency_code()
+
+        instance = self.get_object()
+        qs = (
+            Transaction.objects.filter(
+                account_id=instance.uuid,
+                transaction_date__gte=start_date,
+                transaction_date__lt=end_date,
+            )
+            .prefetch_related("multicurrency", "category")
+            .annotate(month=TruncMonth("transaction_date"))
+            .values("month")
+            .annotate(
+                spendings=Sum(
+                    Coalesce(
+                        Cast(
+                            KeyTextTransform(
+                                currency_code, "multicurrency__amount_map"
+                            ),
+                            FloatField(),
+                        ),
+                        Value(0, output_field=FloatField()),
+                    ),
+                    filter=Q(category__type=EXPENSE),
+                ),
+                income=Sum(
+                    Coalesce(
+                        Cast(
+                            KeyTextTransform(
+                                currency_code, "multicurrency__amount_map"
+                            ),
+                            FloatField(),
+                        ),
+                        Value(0, output_field=FloatField()),
+                    ),
+                    filter=Q(category__type=INCOME),
+                ),
+            )
+            .order_by("-month")
+        )
+        instance.usage = qs
+        serializer = self.get_serializer(instance)
+        return Response(serializer.data)
 
 
 class AccountReassignView(CreateAPIView):

@@ -25,6 +25,11 @@ urlpatterns = [
         name="budget_transactions",
     ),
     path(
+        "account/<uuid:uuid>/usage/",
+        views.AccountUsage.as_view(),
+        name="category_transactions",
+    ),
+    path(
         "category/<uuid:uuid>/",
         views.CategoryTransactions.as_view(),
         name="category_transactions",

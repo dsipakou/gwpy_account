@@ -48,6 +48,11 @@ class TransactionSerializer(serializers.Serializer):
     modified_at = serializers.DateTimeField(read_only=True)
 
 
+class AccountUsageSerializer(serializers.Serializer):
+    spent = serializers.FloatField()
+    income = serializers.FloatField()
+
+
 class GroupedByCategorySerializer(serializers.Serializer):
     category_name = serializers.CharField()
     parent_name = serializers.CharField()

@@ -158,7 +158,13 @@ class AvailableRates(GenericAPIView):
                 exception=True,
                 data={"details": "date_not_found"},
             )
-        base_currency = self.filter_queryset(Currency.objects.all()).get(is_base=True)
+        base_currency = (
+            self.filter_queryset(Currency.objects.all()).filter(is_base=True).first()
+        )
+        if not base_currency:
+            # This is true only in case no currencies are created
+            return Response(data=[])
+
         max_dates = (
             self.filter_queryset(self.get_queryset())
             .filter(base_currency=base_currency, rate_date__lte=date)

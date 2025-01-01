@@ -387,13 +387,15 @@ class BudgetService:
             budgets = budgets.filter(user__uuid=user)
 
         available_currencies = currency_qs.values("code", "is_base")
-        base_currency = available_currencies.get(is_base=True)["code"]
+        base_currency = available_currencies.filter(is_base=True).first()
+        if not base_currency:
+            return []
 
         return cls.make_budgets(
             budgets,
             cls._get_latest_rates(),
             available_currencies,
-            base_currency,
+            base_currency["code"],
         )
 
     # TODO: obsolete, was used in old montyly usage calculator

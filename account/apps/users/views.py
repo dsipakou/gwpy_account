@@ -184,7 +184,9 @@ class ChangePasswordView(UpdateAPIView):
             user.save()
             return Response(status=status.HTTP_200_OK)
         else:
-            return Response("Your current password is incorrect", status=status.HTTP_400_BAD_REQUEST)
+            return Response(
+                "Your current password is incorrect", status=status.HTTP_400_BAD_REQUEST
+            )
 
 
 class UserPermissions(ListAPIView):

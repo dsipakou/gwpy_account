@@ -43,6 +43,13 @@ class Transaction(models.Model):
     modified_at = models.DateTimeField(auto_now=True)
 
     @property
+    def transaction_type(self):
+        parent_category = self.category.parent
+        if parent_category:
+            return parent_category.type
+        return category_constants.EXPENSE
+
+    @property
     def multicurrency_map(self):
         return (
             self.multicurrency.amount_map
@@ -105,7 +112,14 @@ class Transaction(models.Model):
         )
         with connection.cursor() as cursor:
             cursor.execute(
-                raw_sql, [str(workspace), date_from, date_to, category_constants.EXPENSE, currency_code]
+                raw_sql,
+                [
+                    str(workspace),
+                    date_from,
+                    date_to,
+                    category_constants.EXPENSE,
+                    currency_code,
+                ],
             )
             grouped_transactions = dictfetchall(cursor)
 

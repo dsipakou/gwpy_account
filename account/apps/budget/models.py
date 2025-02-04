@@ -33,6 +33,9 @@ class Budget(models.Model):
     created_at = models.DateTimeField(auto_now_add=True)
     modified_at = models.DateTimeField(auto_now=True)
 
+    def __repr__(self) -> str:
+        return f"({self.title} / {self.budget_date} / {self.currency.code})"
+
     @property
     def multicurrency_map(self):
         return (

@@ -1,8 +1,7 @@
-from rest_framework import serializers
-from rest_framework.exceptions import ValidationError
-
 from budget import constants
 from budget.models import Budget
+from rest_framework import serializers
+from rest_framework.exceptions import ValidationError
 from transactions.models import Transaction
 
 
@@ -165,7 +164,7 @@ class LastMonthsUsageSerializer(serializers.Serializer):
 
 
 class DuplicateRequestSerializer(serializers.Serializer):
-    uuids = serializers.ListField()
+    budgets = serializers.ListField()
 
     def validate_type(self, value):
         if value not in constants.ALLOWED_BUDGET_RECURRENT_TYPE:
@@ -177,3 +176,5 @@ class DuplicateResponseSerializer(serializers.Serializer):
     uuid = serializers.UUIDField()
     date = serializers.DateField()
     title = serializers.CharField()
+    amount = serializers.FloatField()
+    currency = serializers.CharField()

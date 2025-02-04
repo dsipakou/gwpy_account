@@ -42,6 +42,9 @@ class Transaction(models.Model):
     created_at = models.DateTimeField(auto_now_add=True)
     modified_at = models.DateTimeField(auto_now=True)
 
+    def __repr__(self) -> str:
+        return f"({self.budget.title} / {self.transaction_date} / {self.category.name} / {self.amount} {self.currency.code})"
+
     @property
     def transaction_type(self):
         parent_category = self.category.parent

@@ -171,7 +171,7 @@ class DuplicateBudgetView(GenericAPIView):
         serializer = self.get_serializer(data=request.data)
         serializer.is_valid(raise_exception=True)
         workspace = request.user.active_workspace
-        BudgetService.duplicate_budget(serializer.data["uuids"], workspace=workspace)
+        BudgetService.duplicate_budget(serializer.data["budgets"], workspace=workspace)
         return Response(status=status.HTTP_201_CREATED)
 
 

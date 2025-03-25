@@ -1,9 +1,13 @@
-ARG PYTHON_VERSION=3.11-slim-bullseye
+FROM ghcr.io/astral-sh/uv:python3.13-bookworm-slim
 
-FROM python:${PYTHON_VERSION}
+# Install the project into `/app`
+WORKDIR /app
 
-ENV PYTHONDONTWRITEBYTECODE 1
-ENV PYTHONUNBUFFERED 1
+# Enable bytecode compilation
+ENV UV_COMPILE_BYTECODE=1
+
+# Copy from the cache instead of linking since it's a mounted volume
+ENV UV_LINK_MODE=copy
 
 # install psycopg2 dependencies.
 RUN apt-get update && apt-get install -y \
@@ -11,18 +15,24 @@ RUN apt-get update && apt-get install -y \
     gcc \
     && rm -rf /var/lib/apt/lists/*
 
-RUN mkdir -p /code
+# Install the project's dependencies using the lockfile and settings
+RUN --mount=type=cache,target=/root/.cache/uv \
+    --mount=type=bind,source=uv.lock,target=uv.lock \
+    --mount=type=bind,source=pyproject.toml,target=pyproject.toml \
+    uv sync --frozen --no-install-project --no-dev
 
-WORKDIR /code
+ADD . /app
+RUN --mount=type=cache,target=/root/.cache/uv \
+    uv sync --frozen --no-dev
 
-RUN pip install poetry
-COPY pyproject.toml poetry.lock /code/
-RUN poetry config virtualenvs.create false
-RUN poetry install --only main --no-root --no-interaction
-COPY . /code
 
-RUN python manage.py collectstatic --noinput
+RUN uv run manage.py collectstatic --noinput
+
+ENV PATH="/app/.venv/bin:$PATH"
 
 EXPOSE 8000
+# Reset the entrypoint, don't invoke `uv`
+ENTRYPOINT []
 
+# CMD ["uv", "run", "gunicorn", "--bind", ":8000", "--workers", "2", "account.wsgi"]
 CMD ["gunicorn", "--bind", ":8000", "--workers", "2", "account.wsgi"]

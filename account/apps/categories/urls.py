@@ -10,4 +10,5 @@ urlpatterns = [
         views.CategoryReassignView.as_view(),
         name="category_reassign",
     ),
+    path("reorder/", views.CategoryReorderView.as_view(), name="category_reorder"),
 ]

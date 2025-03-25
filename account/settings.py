@@ -75,7 +75,12 @@ MIDDLEWARE = [
     "django.middleware.clickjacking.XFrameOptionsMiddleware",
 ]
 
-ALLOWED_HOSTS = ["localhost", "127.0.0.1", "fly-account-api.fly.dev"]
+ALLOWED_HOSTS = [
+    "localhost",
+    "127.0.0.1",
+    "fly-account-api.fly.dev",
+    "api.ispentadollar.com",
+]
 CSRF_TRUSTED_ORIGINS = ["https://fly-account-api.fly.dev"]
 
 CORS_ALLOW_ALL_ORIGINS = True

@@ -147,11 +147,11 @@ class BudgetService:
 
             # If this budget group isn't exists yet in this category - create it
             if transaction_budget_group_key not in category_for_budget.budgets_map:
-                category_for_budget.budgets_map[transaction_budget_group_key] = (
-                    GroupedBudgetModel.init(
-                        budget,
-                        available_currencies,
-                    )
+                category_for_budget.budgets_map[
+                    transaction_budget_group_key
+                ] = GroupedBudgetModel.init(
+                    budget,
+                    available_currencies,
                 )
 
             budget_group_item = category_for_budget.budgets_map[
@@ -237,10 +237,10 @@ class BudgetService:
 
             # Find or append budget to budget group
             if transaction_budget.uuid not in budget_group_item.items_map:
-                budget_group_item.items_map[transaction_budget.uuid] = (
-                    BudgetModel.init_for_transaction(
-                        transaction_budget, available_currencies
-                    )
+                budget_group_item.items_map[
+                    transaction_budget.uuid
+                ] = BudgetModel.init_for_transaction(
+                    transaction_budget, available_currencies
                 )
 
             simple_budget_item = budget_group_item.items_map[transaction_budget.uuid]
@@ -535,9 +535,9 @@ class BudgetService:
                     hasattr(budget, "multicurrency")
                     and currency["code"] in budget.multicurrency.amount_map
                 ):
-                    planned_in_currencies[currency["code"]] = (
-                        budget.multicurrency.amount_map[currency["code"]]
-                    )
+                    planned_in_currencies[
+                        currency["code"]
+                    ] = budget.multicurrency.amount_map[currency["code"]]
                 elif currency["is_base"]:
                     planned_in_currencies[currency["code"]] = planned_in_base_currency
                 else:

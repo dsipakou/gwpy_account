@@ -9,7 +9,12 @@ from rest_framework.mixins import Response
 
 from budget.models import Budget
 from categories.models import Category
-from categories.serializers import CategoryReassignSerializer, CategorySerializer
+from categories.serializers import (
+    CategoryReassignSerializer,
+    CategorySerializer,
+    CategoryReorderSerializer,
+)
+from account.apps.categories.services import CategoryService
 from transactions.models import Transaction
 from workspaces.filters import FilterByWorkspace
 from workspaces.permissions import BaseWorkspacePermission
@@ -106,4 +111,19 @@ class CategoryReassignView(CreateAPIView):
         with transaction.atomic():
             transactions.update(category=dest_category.uuid)
             budgets.update(category=dest_category.parent.uuid)
+        return Response(status=status.HTTP_200_OK)
+
+
+class CategoryReorderView(CreateAPIView):
+    queryset = Category.objects.all()
+    serializer_class = CategoryReorderSerializer
+    permission_classes = (BaseWorkspacePermission,)
+    lookup_field = "uuid"
+
+    def post(self, request, *args, **kwargs):
+        serializer = self.get_serializer(data=request.data)
+        serializer.is_valid()
+        target_category_uuid = serializer.validated_data["category"]
+        previous_category_uuid = serializer.validated_data["previous_category"]
+        CategoryService.reorder_categories(target_category_uuid, previous_category_uuid)
         return Response(status=status.HTTP_200_OK)

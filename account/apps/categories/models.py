@@ -25,17 +25,24 @@ class Category(models.Model):
         max_length=3, choices=constants.CATEGORY_TYPES, default=constants.EXPENSE
     )
     description = models.CharField(max_length=255, blank=True)
+    position = models.PositiveIntegerField(default=0)
     created_at = models.DateTimeField(auto_now_add=True)
     modified_at = models.DateTimeField(auto_now=True)
 
     class Meta:
-        unique_together = ["name", "parent"]
         constraints = [
             models.UniqueConstraint(
-                name="name_parent_null_uniq",
-                fields=["name"],
-                condition=Q(parent=None),
+                name="unique_name_per_parent",
+                fields=["name", "parent"],
             ),
+            models.UniqueConstraint(
+                name="unique_position_per_parent",
+                fields=["parent", "position"],
+            ),
+        ]
+        ordering = ["position"]
+        indexes = [
+            models.Index(fields=["parent", "position"]),
         ]
 
     def __str__(self):

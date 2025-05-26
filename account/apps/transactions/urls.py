@@ -1,5 +1,4 @@
 from django.urls import path
-
 from transactions import views
 
 urlpatterns = [
@@ -38,5 +37,10 @@ urlpatterns = [
         "last-added/",
         views.TransactionsLastAddedView.as_view(),
         name="transactions_last_added",
+    ),
+    path(
+        "bulk-create/",
+        views.TransactionBulkCreate.as_view(),
+        name="transaction_bulk_create",
     ),
 ]

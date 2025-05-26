@@ -7,25 +7,20 @@ from django.db import transaction
 from django.db.models.query import QuerySet
 from django.utils.timezone import now
 from rest_framework import status
-from rest_framework.generics import (
-    ListAPIView,
-    ListCreateAPIView,
-    RetrieveDestroyAPIView,
-    UpdateAPIView,
-)
+from rest_framework.generics import (CreateAPIView, ListAPIView,
+                                     ListCreateAPIView, RetrieveDestroyAPIView,
+                                     UpdateAPIView)
 from rest_framework.response import Response
 from transactions.models import LastViewed, Transaction
-from transactions.serializers import (
-    GroupedTransactionSerializer,
-    AccountUsageSerializer,
-    IncomeSerializer,
-    ReportByMonthSerializer,
-    ReportChartSerializer,
-    TransactionCreateSerializer,
-    TransactionDetailsSerializer,
-    TransactionSerializer,
-    TransactionUpdateSerializer,
-)
+from transactions.serializers import (AccountUsageSerializer,
+                                      GroupedTransactionSerializer,
+                                      IncomeSerializer,
+                                      ReportByMonthSerializer,
+                                      ReportChartSerializer,
+                                      TransactionCreateSerializer,
+                                      TransactionDetailsSerializer,
+                                      TransactionSerializer,
+                                      TransactionUpdateSerializer)
 from transactions.services import ReportService, TransactionService
 from users.filters import FilterByUser
 from workspaces.filters import FilterByWorkspace
@@ -341,3 +336,31 @@ class TransactionsLastAddedView(ListCreateAPIView):
         serializer.save()
 
         return Response(status=status.HTTP_201_CREATED)
+
+
+class TransactionBulkCreate(CreateAPIView):
+    filter_backends = (FilterByUser, FilterByWorkspace)
+    serializer_class = TransactionCreateSerializer
+
+    @transaction.atomic
+    def create(self, request, *args, **kwargs):
+        serializer = self.get_serializer(data=request.data, many=True)
+        serializer.is_valid(raise_exception=True)
+        instances = serializer.save()
+
+        headers = self.get_success_headers(serializer.data)
+        workspace = request.user.active_workspace
+
+        for instance in instances:
+            TransactionService.create_transaction_multicurrency_amount(
+                [instance.uuid], workspace=workspace
+            )
+
+        transactions = []
+        for instance in instances:
+            transactions.append(TransactionService.load_transaction(instance.uuid))
+
+        response_serializer = TransactionSerializer(transactions, many=True)
+        return Response(
+            response_serializer.data, status=status.HTTP_201_CREATED, headers=headers
+        )

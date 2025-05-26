@@ -1,25 +1,23 @@
 from datetime import date, timedelta
-from account.apps.categories.constants import EXPENSE, INCOME
-from dateutil.relativedelta import relativedelta
-from django.db.models import Sum, FloatField, Sum, Value, Q
-from django.db.models.fields.json import KeyTextTransform
-from django.db.models.functions import Cast, Coalesce, TruncMonth
-from rest_framework import status
-from rest_framework.generics import (
-    CreateAPIView,
-    ListCreateAPIView,
-    RetrieveUpdateDestroyAPIView,
-    ValidationError,
-)
-from rest_framework.response import Response
 
 from accounts.models import Account
 from accounts.permissions import BaseAccountPermission
 from accounts.serializers import AccountReassignSerializer, AccountSerializer
+from dateutil.relativedelta import relativedelta
+from django.db.models import FloatField, Q, Sum, Value
+from django.db.models.fields.json import KeyTextTransform
+from django.db.models.functions import Cast, Coalesce, TruncMonth
+from rest_framework import status
+from rest_framework.generics import (CreateAPIView, ListCreateAPIView,
+                                     RetrieveUpdateDestroyAPIView,
+                                     ValidationError)
+from rest_framework.response import Response
 from transactions.models import Transaction
 from users.filters import FilterByUser
 from users.permissions import BaseUserPermission
 from workspaces.filters import FilterByWorkspace
+
+from account.apps.categories.constants import EXPENSE, INCOME
 
 
 class AccountList(ListCreateAPIView):
@@ -93,7 +91,27 @@ class AccountDetails(RetrieveUpdateDestroyAPIView):
             )
             .order_by("-month")
         )
-        instance.usage = qs
+
+        # Convert queryset to list for manipulation
+        usage_list = list(qs)
+
+        # Create a set of existing months for quick lookup
+        existing_months = {item["month"] for item in usage_list}
+
+        # Generate all three months we need
+        current_month = end_date
+        for _ in range(3):
+            current_month = current_month - relativedelta(months=1)
+            if current_month not in existing_months:
+                usage_list.append(
+                    {"month": current_month, "spendings": 0.0, "income": 0.0}
+                )
+
+        # Sort by month in descending order
+        usage_list.sort(key=lambda x: x["month"], reverse=True)
+
+        # Take only the last 3 months
+        instance.usage = usage_list[:3]
         serializer = self.get_serializer(instance)
         return Response(serializer.data)
 

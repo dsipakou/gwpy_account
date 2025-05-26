@@ -1,20 +1,20 @@
-POETRY ?= $(HOME)/.local/bin/poetry
+UV ?= $(HOME)/.local/bin/uv
 
-.PHONY: install-poetry
-install-poetry:
-	curl -sSL https://install.python-poetry.org | python3 -
+.PHONY: install-uv
+install-uv:
+	curl -LsSf https://astral.sh/uv/install.sh | sh
 
 .PHONY: install-packages
 install-packages:
-	$(POETRY) install -vv $(opts)
+	$(UV) sync -vv $(opts)
 
 .PHONY: install
-install: install-poetry install-packages
+install: install-uv install-packages
 
 .PHONY: run-server
 run-server: 
-	$(POETRY) run python manage.py runserver
+	$(UV) run python manage.py runserver
 
 .PHONY: uvicorn-server
 uvicorn-server:
-	$(POETRY) run uvicorn account.asgi:application --host 0.0.0.0
+	$(UV) run uvicorn account.asgi:application --host 0.0.0.0

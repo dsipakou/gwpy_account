@@ -1,6 +1,6 @@
-from rest_framework import serializers
-
 from categories.models import Category
+from rest_framework import serializers
+from rest_framework.fields import MinValueValidator
 
 
 class CategorySerializer(serializers.ModelSerializer):
@@ -63,4 +63,4 @@ class CategoryReassignSerializer(serializers.Serializer):
 
 class CategoryReorderSerializer(serializers.Serializer):
     category = serializers.UUIDField()
-    previous_category = serializers.UUIDField(allow_null=True)
+    index = serializers.IntegerField(validators=[MinValueValidator(0)])

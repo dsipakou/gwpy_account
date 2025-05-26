@@ -1,4 +1,5 @@
-from uuid import UUID
+import time
+
 from categories.models import Category
 from django.db import transaction
 

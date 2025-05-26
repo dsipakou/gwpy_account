@@ -81,7 +81,10 @@ ALLOWED_HOSTS = [
     "fly-account-api.fly.dev",
     "api.ispentadollar.com",
 ]
-CSRF_TRUSTED_ORIGINS = ["https://fly-account-api.fly.dev"]
+CSRF_TRUSTED_ORIGINS = [
+    "https://fly-account-api.fly.dev",
+    "https://api.ispentadollar.com",
+]
 
 CORS_ALLOW_ALL_ORIGINS = True
 CORS_ALLOW_CREDENTIALS = True

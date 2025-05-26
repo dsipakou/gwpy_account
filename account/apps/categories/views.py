@@ -1,27 +1,24 @@
-from django.db.models.deletion import transaction
-from rest_framework.exceptions import ValidationError, status
-from rest_framework.generics import (
-    CreateAPIView,
-    ListCreateAPIView,
-    RetrieveUpdateDestroyAPIView,
-)
-from rest_framework.mixins import Response
-
 from budget.models import Budget
 from categories.models import Category
-from categories.serializers import (
-    CategoryReassignSerializer,
-    CategorySerializer,
-    CategoryReorderSerializer,
-)
-from account.apps.categories.services import CategoryService
+from categories.serializers import (CategoryReassignSerializer,
+                                    CategoryReorderSerializer,
+                                    CategorySerializer)
+from django.db.models.deletion import transaction
+from rest_framework.exceptions import ValidationError, status
+from rest_framework.generics import (CreateAPIView, ListCreateAPIView,
+                                     RetrieveUpdateDestroyAPIView)
+from rest_framework.mixins import Response
 from transactions.models import Transaction
 from workspaces.filters import FilterByWorkspace
 from workspaces.permissions import BaseWorkspacePermission
 
+from account.apps.categories.services import CategoryService
+
 
 class CategoryList(ListCreateAPIView):
-    queryset = Category.objects.all().select_related("parent").order_by("name")
+    queryset = (
+        Category.objects.all().select_related("parent").order_by("position", "name")
+    )
     serializer_class = CategorySerializer
     permission_classes = (BaseWorkspacePermission,)
     filter_backends = (FilterByWorkspace,)
@@ -124,6 +121,6 @@ class CategoryReorderView(CreateAPIView):
         serializer = self.get_serializer(data=request.data)
         serializer.is_valid()
         target_category_uuid = serializer.validated_data["category"]
-        previous_category_uuid = serializer.validated_data["previous_category"]
-        CategoryService.reorder_categories(target_category_uuid, previous_category_uuid)
+        new_index = serializer.validated_data["index"]
+        CategoryService.reorder_categories(target_category_uuid, new_index)
         return Response(status=status.HTTP_200_OK)

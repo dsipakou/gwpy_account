@@ -175,3 +175,7 @@ Dockerfile.*
 
 # Bruno API client 
 fly-account
+
+# Claude-code
+.opencode/*
+CLAUDE.md

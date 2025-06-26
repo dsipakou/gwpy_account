@@ -48,6 +48,10 @@ class TransactionSerializer(serializers.Serializer):
     modified_at = serializers.DateTimeField(read_only=True)
 
 
+class TransactionBulkSerializer(TransactionSerializer):
+    row_id = serializers.IntegerField(read_only=True)
+
+
 class AccountUsageSerializer(serializers.Serializer):
     spent = serializers.FloatField()
     income = serializers.FloatField()
@@ -99,6 +103,38 @@ class TransactionCreateSerializer(serializers.ModelSerializer):
         return super().create(data)
 
 
+class TransactionBulkCreateSerializer(serializers.ModelSerializer):
+    row_id = serializers.IntegerField(write_only=True, required=True)
+
+    class Meta:
+        model = Transaction
+        fields = (
+            "row_id",
+            "user",
+            "category",
+            "budget",
+            "currency",
+            "amount",
+            "account",
+            "description",
+            "transaction_date",
+        )
+
+    def create(self, validated_data):
+        workspace = validated_data["user"].active_workspace
+        validated_data.pop("row_id")
+        if not workspace:
+            raise ValidationError("User has no active workspace")
+        category_type = validated_data["category"].type
+        if category_type == constants.EXPENSE and validated_data["budget"] is None:
+            raise ValidationError("Expsense should contain budget specified")
+        data = {
+            **validated_data,
+            "workspace": workspace,
+        }
+        return super().create(data)
+
+
 class TransactionDetailsSerializer(serializers.ModelSerializer):
     class Meta:
         model = Transaction
@@ -133,6 +169,14 @@ class TransactionUpdateSerializer(serializers.ModelSerializer):
             "created_at",
             "modified_at",
         )
+
+
+class TransactionBulkUpdateSerializer(serializers.Serializer):
+    row_id = serializers.IntegerField(write_only=True, required=True)
+
+    class Meta:
+        model = Transaction
+        fields = TransactionUpdateSerializer.Meta.fields + ("row_id",)
 
 
 class ReportByMonthSerializer(serializers.Serializer):

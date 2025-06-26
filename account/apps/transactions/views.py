@@ -20,7 +20,10 @@ from transactions.serializers import (AccountUsageSerializer,
                                       TransactionCreateSerializer,
                                       TransactionDetailsSerializer,
                                       TransactionSerializer,
-                                      TransactionUpdateSerializer)
+                                      TransactionBulkSerializer,
+                                      TransactionUpdateSerializer,
+                                      TransactionBulkCreateSerializer,
+                                      TransactionBulkUpdateSerializer)
 from transactions.services import ReportService, TransactionService
 from users.filters import FilterByUser
 from workspaces.filters import FilterByWorkspace
@@ -340,7 +343,7 @@ class TransactionsLastAddedView(ListCreateAPIView):
 
 class TransactionBulkCreate(CreateAPIView):
     filter_backends = (FilterByUser, FilterByWorkspace)
-    serializer_class = TransactionCreateSerializer
+    serializer_class = TransactionBulkCreateSerializer
 
     @transaction.atomic
     def create(self, request, *args, **kwargs):
@@ -357,10 +360,43 @@ class TransactionBulkCreate(CreateAPIView):
             )
 
         transactions = []
-        for instance in instances:
-            transactions.append(TransactionService.load_transaction(instance.uuid))
+        for idx, instance in enumerate(instances):
+            transactions.append(
+                {
+                    "row_id": serializer.validated_data[idx]["row_id"],
+                    **TransactionService.load_transaction(instance.uuid),
+                }
+            )
 
-        response_serializer = TransactionSerializer(transactions, many=True)
+        response_serializer = TransactionBulkSerializer(transactions, many=True)
         return Response(
             response_serializer.data, status=status.HTTP_201_CREATED, headers=headers
         )
+
+
+class TransactionBulkUpdate(UpdateAPIView):
+    filter_backends = (FilterByUser, FilterByWorkspace)
+    serializer_class = TransactionBulkUpdateSerializer
+
+    @transaction.atomic
+    def update(self, request, *args, **kwargs):
+        instance = self.get_existing_object()
+        serializer = self.get_serializer(
+            instance, data=request.data, partial=True, many=True
+        )
+        serializer.is_valid(raise_exception=True)
+        workspace = request.user.active_workspace
+        instances = self.perform_update(serializer)
+
+        for instance in instances:
+            TransactionService.create_transaction_multicurrency_amount(
+                [instance.uuid], workspace=workspace
+            )
+
+        TransactionService.create_transaction_multicurrency_amount(
+            [instance.uuid], workspace=workspace
+        )
+        transaction = TransactionService.load_transaction(instance.uuid)
+        serializer = TransactionSerializer(transaction)
+
+        return Response(serializer.data, status=status.HTTP_200_OK)

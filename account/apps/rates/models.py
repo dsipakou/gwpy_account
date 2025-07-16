@@ -1,8 +1,7 @@
 import uuid
 
-from django.db import models
-
 from currencies.models import Currency
+from django.db import models
 
 
 class Rate(models.Model):

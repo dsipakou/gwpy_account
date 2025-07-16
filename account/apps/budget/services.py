@@ -1,15 +1,20 @@
 import datetime
-import math
-from dateutil.rrule import rrule, MONTHLY
 import logging
 from typing import Dict, List, Optional
 from uuid import UUID
 
+from categories import constants
+from currencies.models import Currency
 from dateutil.relativedelta import relativedelta
-from django.db.models import Avg, Count, FloatField, Prefetch, Q, QuerySet, Sum, Value
-from django.db.models.functions import Round
+from dateutil.rrule import MONTHLY, rrule
+from django.db.models import Count, FloatField, Prefetch, Q, QuerySet, Sum, Value
 from django.db.models.fields.json import KeyTextTransform
-from django.db.models.functions import Cast, Coalesce, TruncMonth
+from django.db.models.functions import Cast, Coalesce, Round, TruncMonth
+from rates.models import Rate
+from rates.utils import generate_amount_map
+from transactions.models import Rate, Transaction
+from users.models import User
+from workspaces.models import Workspace
 
 from budget import utils
 from budget.constants import BudgetDuplicateType
@@ -26,13 +31,6 @@ from budget.entities import (
 )
 from budget.exceptions import UnsupportedDuplicateTypeError
 from budget.models import Budget, BudgetMulticurrency
-from categories import constants
-from currencies.models import Currency
-from rates.models import Rate
-from rates.utils import generate_amount_map
-from transactions.models import Rate, Transaction
-from users.models import User
-from workspaces.models import Workspace
 
 RECURRENT_TYPE_MAPPING = {
     BudgetDuplicateType.MONTHLY: {

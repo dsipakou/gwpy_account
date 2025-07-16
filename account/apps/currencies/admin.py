@@ -1,7 +1,7 @@
 from django.contrib import admin
+from rates.models import Rate
 
 from currencies.models import Currency
-from rates.models import Rate
 
 
 class CurrencyAdmin(admin.ModelAdmin):

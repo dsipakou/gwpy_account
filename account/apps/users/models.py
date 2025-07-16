@@ -1,12 +1,11 @@
 import uuid
-from roles.constants import Roles
-from roles.models import UserRole
 
+from currencies.models import Currency
 from django.contrib.auth.models import AbstractUser
 from django.db import models
 from django.utils.translation import gettext_lazy as _
-
-from currencies.models import Currency
+from roles.constants import Roles
+from roles.models import UserRole
 
 
 class User(AbstractUser):

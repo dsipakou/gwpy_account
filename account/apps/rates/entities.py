@@ -1,6 +1,5 @@
 from datetime import date
 from typing import List, TypedDict
-from uuid import UUID
 
 from pydantic import BaseModel
 

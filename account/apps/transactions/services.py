@@ -3,13 +3,12 @@ import datetime
 from typing import Dict, List, Optional, Union
 from uuid import UUID
 
-from account.apps.categories.constants import CategoryType
-from django.db.models import QuerySet
-
 from categories import constants as category_constants
-from categories.models import Category
+from django.db.models import QuerySet
 from rates.models import Rate
 from rates.utils import generate_amount_map
+from workspaces.models import Workspace
+
 from transactions.entities import (
     GroupedByCategory,
     GroupedByMonth,
@@ -22,7 +21,6 @@ from transactions.entities import (
     TransactionSpentInCurrencyDetails,
 )
 from transactions.models import Transaction, TransactionMulticurrency
-from workspaces.models import Workspace
 
 
 class TransactionService:

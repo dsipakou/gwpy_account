@@ -1,21 +1,19 @@
 import datetime
 import textwrap
 import uuid
-from enum import unique
 from typing import Optional
 
-from django.contrib.postgres.aggregates import StringAgg
+from categories import constants as category_constants
+from currencies.models import Currency
 from django.db import connection, models
 from django.db.models import QuerySet
 from django.db.models.fields.json import KeyTextTransform
 from django.db.models.functions import Cast, Trunc
 from django.db.models.functions.datetime import TruncMonth
-
-from categories import constants as category_constants
-from currencies.models import Currency
 from rates.models import Rate
-from transactions.utils import dictfetchall
 from users.models import User
+
+from transactions.utils import dictfetchall
 
 
 class Transaction(models.Model):

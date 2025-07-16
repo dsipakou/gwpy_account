@@ -1,13 +1,13 @@
 import datetime
 from typing import Dict, List, Optional, TypedDict
 from uuid import UUID, uuid4
-from pydantic.deprecated.class_validators import validator
-from transactions.models import Transaction
-from categories.models import Category
-from currencies.models import Currency
-from budget.models import Budget
 
 import pydantic
+from categories.models import Category
+from currencies.models import Currency
+from transactions.models import Transaction
+
+from budget.models import Budget
 
 
 class BudgetTransactionItem(TypedDict):

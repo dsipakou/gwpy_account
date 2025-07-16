@@ -1,10 +1,12 @@
 import uuid
+
 from django.test import TestCase
+from parameterized import parameterized
+from users.models import User
+from workspaces.models import Workspace
+
 from categories.models import Category
 from categories.services import CategoryService
-from workspaces.models import Workspace
-from users.models import User
-from parameterized import parameterized
 
 
 class TestCategoryService(TestCase):

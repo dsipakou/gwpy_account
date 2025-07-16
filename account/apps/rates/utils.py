@@ -3,8 +3,9 @@ from typing import Dict, List, Union
 
 from budget.models import Budget
 from currencies.models import Currency
-from rates.models import Rate
 from transactions.models import Transaction
+
+from rates.models import Rate
 
 
 def generate_date_seq(days_count):

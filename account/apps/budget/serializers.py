@@ -1,8 +1,8 @@
-from budget import constants
-from budget.models import Budget
 from rest_framework import serializers
 from rest_framework.exceptions import ValidationError
-from transactions.models import Transaction
+
+from budget import constants
+from budget.models import Budget
 
 
 class BudgetSerializer(serializers.ModelSerializer):

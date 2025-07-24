@@ -23,9 +23,34 @@ dependencies = [
 
 [dependency-groups]
 dev = [
-    "black<23.0.0,>=22.3.0",
-    "isort<6.0.0,>=5.10.1",
     "parameterized>=0.9.0",
     "pytest>=8.3.5",
     "ruff>=0.12.3",
 ]
+
+[tool.ruff]
+line-length = 88  # Match black's default
+
+[tool.ruff.lint]
+# Select the rule groups you want to enable
+extend-select = ["I"]  # Enable isort rules
+select = [
+    "E",   # pycodestyle errors
+    "W",   # pycodestyle warnings  
+    "F",   # pyflakes
+    "I",   # isort (import sorting)
+    "UP",  # pyupgrade
+    "B",   # flake8-bugbear
+    "C4",  # flake8-comprehensions
+]
+
+[tool.ruff.lint.isort]
+# Configure import sorting (isort replacement)
+known-first-party = ["budget", "categories", "currencies", "rates", "transactions", "users", "workspaces", "accounts", "roles"]
+known-third-party = ["django", "rest_framework", "dateutil", "psycopg2", "uvicorn", "gunicorn"]
+
+[tool.ruff.format]
+# Configure code formatting (black replacement)
+quote-style = "double"
+indent-style = "space"
+line-ending = "auto"

@@ -1,6 +1,5 @@
-from django.urls import path
-
 from currencies import views
+from django.urls import path
 
 urlpatterns = [
     path("", views.CurrencyList.as_view(), name="currency_list"),

@@ -1,9 +1,8 @@
 from django.contrib.auth.password_validation import validate_password
 from rest_framework import serializers
 from rest_framework.validators import UniqueValidator
-from workspaces.models import Workspace
-
 from users.models import Invite, User
+from workspaces.models import Workspace
 
 
 class UserSerializer(serializers.ModelSerializer):

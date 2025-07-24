@@ -1,30 +1,21 @@
-
 from currencies.models import Currency
 from django.db.models import F, Max, Window
 from django.db.models.functions import RowNumber
-from rest_framework.generics import (
-    CreateAPIView,
-    GenericAPIView,
-    ListAPIView,
-    ListCreateAPIView,
-    RetrieveUpdateDestroyAPIView,
-)
+from rates.filters import DateFilter
+from rates.models import Rate
+from rates.serializers import (AvailableRates, CreateBatchedRateSerializer,
+                               RateChartDataSerializer, RateChartSerializer,
+                               RateSerializer)
+from rates.services import RateService
+from rates.utils import generate_date_seq
+from rest_framework.generics import (CreateAPIView, GenericAPIView,
+                                     ListAPIView, ListCreateAPIView,
+                                     RetrieveUpdateDestroyAPIView)
 from rest_framework.response import Response
 from rest_framework.status import HTTP_400_BAD_REQUEST
 from workspaces.filters import FilterByWorkspace
 
 from account.apps.rates.entities import RateOnDate
-from rates.filters import DateFilter
-from rates.models import Rate
-from rates.serializers import (
-    AvailableRates,
-    CreateBatchedRateSerializer,
-    RateChartDataSerializer,
-    RateChartSerializer,
-    RateSerializer,
-)
-from rates.services import RateService
-from rates.utils import generate_date_seq
 
 
 class RateList(ListCreateAPIView):

@@ -15,7 +15,6 @@ def set_budget_currency(apps, schema_editor):
 
 
 class Migration(migrations.Migration):
-
     dependencies = [
         ("budget", "0006_budget_user"),
     ]

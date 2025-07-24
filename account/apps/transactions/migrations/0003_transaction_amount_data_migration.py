@@ -2,7 +2,6 @@
 
 from django.db import migrations
 from rates.models import Rate
-
 from transactions.models import Transaction
 
 

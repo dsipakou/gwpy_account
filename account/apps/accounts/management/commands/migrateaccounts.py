@@ -1,10 +1,9 @@
 import csv
 import uuid
 
+from accounts.models import Account
 from django.core.management.base import BaseCommand
 from users.models import User
-
-from accounts.models import Account
 
 
 class Command(BaseCommand):

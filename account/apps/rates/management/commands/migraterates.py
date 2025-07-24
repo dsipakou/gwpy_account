@@ -3,7 +3,6 @@ import uuid
 
 from currencies.models import Currency
 from django.core.management.base import BaseCommand
-
 from rates.models import Rate
 
 CURRENCY_MAP = {2: "USD", 4: "EUR", 6: "RUB", 7: "PLN"}

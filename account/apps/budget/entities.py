@@ -1,13 +1,13 @@
 import datetime
-from typing import Dict, List, Optional, TypedDict
+from typing import TypedDict
 from uuid import UUID, uuid4
 
 import pydantic
+
+from budget.models import Budget
 from categories.models import Category
 from currencies.models import Currency
 from transactions.models import Transaction
-
-from budget.models import Budget
 
 
 class BudgetTransactionItem(TypedDict):
@@ -16,7 +16,7 @@ class BudgetTransactionItem(TypedDict):
     currency_code: str
     spent_in_base_currency: float
     spent_in_original_currency: float
-    spent_in_currencies: Dict[str, float]
+    spent_in_currencies: dict[str, float]
     transaction_date: str
 
 
@@ -27,16 +27,16 @@ class BudgetItem(TypedDict):
     currency: UUID
     title: str
     budget_date: datetime.date
-    transactions: List[BudgetTransactionItem]
+    transactions: list[BudgetTransactionItem]
     category_name: str
     description: str
     is_completed: bool
     recurrent: str
     planned: float
-    planned_in_currencies: Dict[str, float]
+    planned_in_currencies: dict[str, float]
     spent_in_base_currency: float
     spent_in_original_currency: float
-    spent_in_currencies: Dict[str, float]
+    spent_in_currencies: dict[str, float]
     created_at: datetime.datetime
     modified_at: datetime.datetime
 
@@ -71,11 +71,11 @@ class BudgetModel(pydantic.BaseModel):
     parent_budget: str = ""
     title: str
     budget_date: datetime.date
-    transactions: List[BudgetTransactionModel] = pydantic.Field(default_factory=list)
+    transactions: list[BudgetTransactionModel] = pydantic.Field(default_factory=list)
     category_name: str
-    description: Optional[str]
+    description: str | None
     is_completed: bool
-    recurrent: Optional[str]
+    recurrent: str | None
     planned: float = pydantic.Field(ge=0, default=0)
     spent: float = pydantic.Field(ge=0, default=0)
     planned_in_currencies: dict[str, float] = pydantic.Field(default_factory=dict)
@@ -88,7 +88,7 @@ class BudgetModel(pydantic.BaseModel):
 
     @classmethod
     def init(
-        cls, budget: Budget, available_currencies: List[Currency]
+        cls, budget: Budget, available_currencies: list[Currency]
     ) -> "BudgetModel":
         return cls(
             uuid=budget.uuid,
@@ -115,7 +115,7 @@ class BudgetModel(pydantic.BaseModel):
 
     @classmethod
     def init_for_transaction(
-        cls, budget: Budget, available_currencies: List[Currency]
+        cls, budget: Budget, available_currencies: list[Currency]
     ) -> "BudgetModel":
         return cls(
             uuid=budget.uuid,
@@ -140,7 +140,7 @@ class BudgetModel(pydantic.BaseModel):
         )
 
     def update_spent_values(
-        self, available_currencies: List[Currency], amount: Dict[str, int]
+        self, available_currencies: list[Currency], amount: dict[str, int]
     ):
         for currency in available_currencies:
             self.spent_in_currencies[currency["code"]] = round(
@@ -157,7 +157,7 @@ class GroupedBudgetModel(pydantic.BaseModel):
     planned: float = pydantic.Field(ge=0, default=0)
     spent: float = pydantic.Field(ge=0, default=0)
     items: list[BudgetModel] = pydantic.Field(default_factory=list)
-    items_map: Dict[UUID, BudgetModel] = pydantic.Field(default_factory=dict)
+    items_map: dict[UUID, BudgetModel] = pydantic.Field(default_factory=dict)
     is_another_category: bool = pydantic.Field(default=False)
     is_another_month: bool = pydantic.Field(default=False)
     planned_in_currencies: dict = pydantic.Field(default_factory=dict)
@@ -179,7 +179,7 @@ class GroupedBudgetModel(pydantic.BaseModel):
 
     @classmethod
     def init(
-        cls, budget: Budget, available_currencies: List[Currency]
+        cls, budget: Budget, available_currencies: list[Currency]
     ) -> "GroupedBudgetModel":
         return cls(
             user=budget.user.uuid,
@@ -203,7 +203,7 @@ class GroupedBudgetModel(pydantic.BaseModel):
         category: Category,
         date_from: datetime.date,
         date_to: datetime.date,
-        available_currencies: List[Currency],
+        available_currencies: list[Currency],
     ) -> "GroupedBudgetModel":
         return cls(
             user=budget.user.uuid,
@@ -224,7 +224,7 @@ class GroupedBudgetModel(pydantic.BaseModel):
         )
 
     def update_planned_values(
-        self, available_currencies: List[Currency], amount: Dict[str, int]
+        self, available_currencies: list[Currency], amount: dict[str, int]
     ):
         for currency in available_currencies:
             self.planned_in_currencies[currency["code"]] = round(
@@ -234,7 +234,7 @@ class GroupedBudgetModel(pydantic.BaseModel):
             )
 
     def update_spent_values(
-        self, available_currencies: List[Currency], amount: Dict[str, int]
+        self, available_currencies: list[Currency], amount: dict[str, int]
     ):
         for currency in available_currencies:
             self.spent_in_currencies[currency["code"]] = round(
@@ -244,7 +244,7 @@ class GroupedBudgetModel(pydantic.BaseModel):
             )
 
     def update_spent_overall_values(
-        self, available_currencies: List[Currency], amount: Dict[str, int]
+        self, available_currencies: list[Currency], amount: dict[str, int]
     ):
         for currency in available_currencies:
             self.spent_in_currencies_overall[currency["code"]] = round(
@@ -259,18 +259,18 @@ class BudgetGroupedItem(TypedDict):
     user: UUID
     title: str
     planned: float
-    planned_in_currencies: Dict[str, float]
+    planned_in_currencies: dict[str, float]
     spent_in_base_currency: float
     spent_in_original_currency: float
-    spent_in_currencies: Dict[str, float]
-    items: List[BudgetItem]
+    spent_in_currencies: dict[str, float]
+    items: list[BudgetItem]
 
 
 class CategoryModel(pydantic.BaseModel):
     uuid: UUID
     category_name: str
-    budgets: List[GroupedBudgetModel] = pydantic.Field(default_factory=list)
-    budgets_map: Dict[UUID, GroupedBudgetModel] = pydantic.Field(default_factory=dict)
+    budgets: list[GroupedBudgetModel] = pydantic.Field(default_factory=list)
+    budgets_map: dict[UUID, GroupedBudgetModel] = pydantic.Field(default_factory=dict)
     planned: float = pydantic.Field(ge=0, default=0)
     spent: float = pydantic.Field(ge=0, default=0)
     planned_in_currencies: dict[str, float] = pydantic.Field(default_factory=dict)
@@ -278,7 +278,7 @@ class CategoryModel(pydantic.BaseModel):
 
     @classmethod
     def init(
-        cls, category: Category, available_currencies: List[Currency]
+        cls, category: Category, available_currencies: list[Currency]
     ) -> "CategoryModel":
         return cls(
             uuid=category.uuid,
@@ -293,7 +293,7 @@ class CategoryModel(pydantic.BaseModel):
         )
 
     def update_planned_values(
-        self, available_currencies: List[Currency], amount: Dict[str, int]
+        self, available_currencies: list[Currency], amount: dict[str, int]
     ):
         for currency in available_currencies:
             self.planned_in_currencies[currency["code"]] = round(
@@ -303,7 +303,7 @@ class CategoryModel(pydantic.BaseModel):
             )
 
     def update_spent_values(
-        self, available_currencies: List[Currency], amount: Dict[str, int]
+        self, available_currencies: list[Currency], amount: dict[str, int]
     ):
         for currency in available_currencies:
             self.spent_in_currencies[currency["code"]] = round(
@@ -317,12 +317,12 @@ class CategoryItem(TypedDict):
     uuid: UUID
     user: UUID
     category_name: str
-    budgets: List[BudgetGroupedItem]
+    budgets: list[BudgetGroupedItem]
     planned: float
-    planned_in_currencies: Dict[str, float]
+    planned_in_currencies: dict[str, float]
     spent_in_original_currency: float
     spent_in_base_currency: float
-    spent_in_currencies: Dict[str, float]
+    spent_in_currencies: dict[str, float]
 
 
 class MonthUsageSum(pydantic.BaseModel):

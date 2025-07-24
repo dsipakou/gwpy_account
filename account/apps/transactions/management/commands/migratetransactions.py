@@ -6,9 +6,8 @@ from budget.models import Budget
 from categories.models import Category
 from currencies.models import Currency
 from django.core.management.base import BaseCommand
-from users.models import User
-
 from transactions.models import Transaction
+from users.models import User
 
 
 class Command(BaseCommand):

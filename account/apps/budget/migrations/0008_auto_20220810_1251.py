@@ -18,7 +18,6 @@ def set_budget_user(apps, schema_editor):
 
 
 class Migration(migrations.Migration):
-
     dependencies = [
         ("budget", "0007_auto_20220810_1242"),
     ]

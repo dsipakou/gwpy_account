@@ -11,9 +11,8 @@ from django.db.models.fields.json import KeyTextTransform
 from django.db.models.functions import Cast, Trunc
 from django.db.models.functions.datetime import TruncMonth
 from rates.models import Rate
-from users.models import User
-
 from transactions.utils import dictfetchall
+from users.models import User
 
 
 class Transaction(models.Model):

@@ -1,7 +1,4 @@
-from rest_framework.generics import (
-    ListAPIView,
-)
-
+from rest_framework.generics import ListAPIView
 from roles.models import Role
 from roles.serializers import RolesSerializer
 

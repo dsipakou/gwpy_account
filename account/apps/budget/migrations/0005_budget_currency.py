@@ -5,7 +5,6 @@ from django.db import migrations, models
 
 
 class Migration(migrations.Migration):
-
     dependencies = [
         ("currencies", "0001_initial"),
         ("budget", "0004_budget_recurrent"),

@@ -1,12 +1,11 @@
 from budget.models import Budget
 from budget.services import BudgetService
 from django.db import transaction
+from rates.entities import BatchedRateRequest
+from rates.models import Rate
 from transactions.models import Transaction
 from transactions.services import TransactionService
 from users.models import User
-
-from rates.entities import BatchedRateRequest
-from rates.models import Rate
 
 
 class RateService:

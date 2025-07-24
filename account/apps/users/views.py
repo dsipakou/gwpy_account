@@ -3,32 +3,23 @@ from django.contrib.auth import authenticate
 from rest_framework import status
 from rest_framework.authtoken.models import Token
 from rest_framework.authtoken.views import ObtainAuthToken
-from rest_framework.generics import (
-    CreateAPIView,
-    DestroyAPIView,
-    ListAPIView,
-    ListCreateAPIView,
-    UpdateAPIView,
-)
+from rest_framework.generics import (CreateAPIView, DestroyAPIView,
+                                     ListAPIView, ListCreateAPIView,
+                                     UpdateAPIView)
 from rest_framework.permissions import AllowAny
 from rest_framework.response import Response
 from roles.models import Role, UserRole
-from workspaces.filters import FilterByWorkspace
-
 from users.entities import UserSchema
 from users.filters import FilterByUser
 from users.models import Invite, User
 from users.permissions import UserRolePermissions
-from users.serializers import (
-    ChangeDefaultCurrencySerializer,
-    ChangePasswordSerializer,
-    ChangeUserRoleSerializer,
-    InviteRequestSerializer,
-    InviteSeriazlier,
-    RegisterSerializer,
-    UserLoginSerializer,
-    UserSerializer,
-)
+from users.serializers import (ChangeDefaultCurrencySerializer,
+                               ChangePasswordSerializer,
+                               ChangeUserRoleSerializer,
+                               InviteRequestSerializer, InviteSeriazlier,
+                               RegisterSerializer, UserLoginSerializer,
+                               UserSerializer)
+from workspaces.filters import FilterByWorkspace
 
 
 class UserList(ListAPIView):

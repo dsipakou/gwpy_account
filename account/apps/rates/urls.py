@@ -1,5 +1,4 @@
 from django.urls import path, register_converter
-
 from rates import converters, views
 
 register_converter(converters.YearMonthDayConverter, "ymddate")

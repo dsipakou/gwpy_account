@@ -5,7 +5,6 @@ from django.db import migrations, models
 
 
 class Migration(migrations.Migration):
-
     dependencies = [
         ("workspaces", "0003_workspace_created_at_workspace_modified_at"),
         ("budget", "0015_alter_budget_unique_together"),

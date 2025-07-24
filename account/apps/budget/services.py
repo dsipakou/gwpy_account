@@ -1,20 +1,12 @@
 import datetime
 import logging
-from typing import Dict, List, Optional
 from uuid import UUID
 
-from categories import constants
-from currencies.models import Currency
 from dateutil.relativedelta import relativedelta
 from dateutil.rrule import MONTHLY, rrule
 from django.db.models import Count, FloatField, Prefetch, Q, QuerySet, Sum, Value
 from django.db.models.fields.json import KeyTextTransform
 from django.db.models.functions import Cast, Coalesce, Round, TruncMonth
-from rates.models import Rate
-from rates.utils import generate_amount_map
-from transactions.models import Rate, Transaction
-from users.models import User
-from workspaces.models import Workspace
 
 from budget import utils
 from budget.constants import BudgetDuplicateType
@@ -31,6 +23,13 @@ from budget.entities import (
 )
 from budget.exceptions import UnsupportedDuplicateTypeError
 from budget.models import Budget, BudgetMulticurrency
+from categories import constants
+from currencies.models import Currency
+from rates.models import Rate
+from rates.utils import generate_amount_map
+from transactions.models import Transaction
+from users.models import User
+from workspaces.models import Workspace
 
 RECURRENT_TYPE_MAPPING = {
     BudgetDuplicateType.MONTHLY: {
@@ -45,6 +44,13 @@ RECURRENT_TYPE_MAPPING = {
         "relative_date": relativedelta(weeks=1),
         "relative_usage": relativedelta(weeks=5),
     },
+    BudgetDuplicateType.OCCASIONAL: {
+        "start_date": utils.get_first_day_of_prev_month,
+        "end_date": utils.get_last_day_of_prev_month,
+        "relative_date": relativedelta(months=1),
+        "relative_usage": relativedelta(months=6),
+        "lookback_months": 6,
+    },
 }
 
 logger = logging.getLogger(__name__)
@@ -53,7 +59,7 @@ logger = logging.getLogger(__name__)
 class BudgetService:
     @classmethod
     def create_budget_multicurrency_amount(
-        cls, uuids: List[UUID], workspace: Workspace
+        cls, uuids: list[UUID], workspace: Workspace
     ):
         budgets = Budget.objects.select_related("currency").filter(uuid__in=uuids)
         dates = budgets.values_list("budget_date", flat=True).distinct()
@@ -84,7 +90,7 @@ class BudgetService:
         transactions_qs: QuerySet,
         date_from: str,
         date_to: str,
-        user: Optional[str],
+        user: str | None,
     ):
         print("----------------------")
         print("----- start here -----")
@@ -145,11 +151,11 @@ class BudgetService:
 
             # If this budget group isn't exists yet in this category - create it
             if transaction_budget_group_key not in category_for_budget.budgets_map:
-                category_for_budget.budgets_map[
-                    transaction_budget_group_key
-                ] = GroupedBudgetModel.init(
-                    budget,
-                    available_currencies,
+                category_for_budget.budgets_map[transaction_budget_group_key] = (
+                    GroupedBudgetModel.init(
+                        budget,
+                        available_currencies,
+                    )
                 )
 
             budget_group_item = category_for_budget.budgets_map[
@@ -235,10 +241,10 @@ class BudgetService:
 
             # Find or append budget to budget group
             if transaction_budget.uuid not in budget_group_item.items_map:
-                budget_group_item.items_map[
-                    transaction_budget.uuid
-                ] = BudgetModel.init_for_transaction(
-                    transaction_budget, available_currencies
+                budget_group_item.items_map[transaction_budget.uuid] = (
+                    BudgetModel.init_for_transaction(
+                        transaction_budget, available_currencies
+                    )
                 )
 
             simple_budget_item = budget_group_item.items_map[transaction_budget.uuid]
@@ -317,8 +323,8 @@ class BudgetService:
         currency_qs: QuerySet,
         date_from: datetime.date,
         date_to: datetime.date,
-        user: Optional[str],
-    ) -> List[CategoryItem]:
+        user: str | None,
+    ) -> list[CategoryItem]:
         cls.start = datetime.datetime.now()
         logger.debug("budget.service.transaction_prefetch.start")
         budget_transactions_prefetch = Prefetch(
@@ -369,8 +375,8 @@ class BudgetService:
         date_from,
         date_to,
         workspace: Workspace,
-        user: Optional[str],
-    ) -> List[BudgetItem]:
+        user: str | None,
+    ) -> list[BudgetItem]:
         budgets = (
             qs.filter(budget_date__lte=date_to, budget_date__gte=date_from)
             .prefetch_related(
@@ -405,7 +411,7 @@ class BudgetService:
     @classmethod
     def make_categories(
         cls, currency_qs: QuerySet, categories, latest_rates
-    ) -> List[CategoryItem]:
+    ) -> list[CategoryItem]:
         categories_list = []
         eval_categories = [category for category in categories]
         available_currencies = currency_qs.values("code", "is_base")
@@ -454,7 +460,7 @@ class BudgetService:
     @classmethod
     def make_grouped_budgets(
         cls, budgets, latest_rates, available_currencies, base_currency
-    ) -> List[BudgetGroupedItem]:
+    ) -> list[BudgetGroupedItem]:
         budgets_list = []
         grouped_dict = {}
         for budget in cls.make_budgets(
@@ -485,21 +491,13 @@ class BudgetService:
                         currency["code"]
                     ] = grouped_dict[budget["title"]]["spent_in_currencies"].get(
                         currency["code"], 0
-                    ) + budget[
-                        "spent_in_currencies"
-                    ].get(
-                        currency["code"], 0
-                    )
+                    ) + budget["spent_in_currencies"].get(currency["code"], 0)
 
                     grouped_dict[budget["title"]]["planned_in_currencies"][
                         currency["code"]
                     ] = grouped_dict[budget["title"]]["planned_in_currencies"].get(
                         currency["code"], 0
-                    ) + budget[
-                        "planned_in_currencies"
-                    ].get(
-                        currency["code"], 0
-                    )
+                    ) + budget["planned_in_currencies"].get(currency["code"], 0)
                 grouped_dict[budget["title"]]["items"].append(budget)
 
         for value in grouped_dict.values():
@@ -509,7 +507,7 @@ class BudgetService:
     @classmethod
     def make_budgets(
         cls, budgets, latest_rates, available_currencies, base_currency
-    ) -> List[BudgetItem]:
+    ) -> list[BudgetItem]:
         budgets_list = []
         for budget in budgets:
             multicurrency_map = (
@@ -533,9 +531,9 @@ class BudgetService:
                     hasattr(budget, "multicurrency")
                     and currency["code"] in budget.multicurrency.amount_map
                 ):
-                    planned_in_currencies[
-                        currency["code"]
-                    ] = budget.multicurrency.amount_map[currency["code"]]
+                    planned_in_currencies[currency["code"]] = (
+                        budget.multicurrency.amount_map[currency["code"]]
+                    )
                 elif currency["is_base"]:
                     planned_in_currencies[currency["code"]] = planned_in_base_currency
                 else:
@@ -591,7 +589,7 @@ class BudgetService:
     @classmethod
     def make_transactions(
         cls, transactions, latest_rates, base_currency_code: str
-    ) -> List[dict]:
+    ) -> list[dict]:
         transactions_list = []
         for transaction in transactions:
             multicurrency_map = (
@@ -627,10 +625,14 @@ class BudgetService:
 
     @classmethod
     def get_duplicate_budget_candidates(
-        cls, qs, recurrent_type: BudgetDuplicateType, pivot_date: Optional[str] = None
-    ) -> List[Dict[datetime.date, str]]:
+        cls, qs, recurrent_type: BudgetDuplicateType, pivot_date: str | None = None
+    ) -> list[dict[datetime.date, str]]:
         if RECURRENT_TYPE_MAPPING.get(recurrent_type) is None:
             raise UnsupportedDuplicateTypeError
+
+        # For OCCASIONAL type, we need broader search criteria
+        if recurrent_type == BudgetDuplicateType.OCCASIONAL:
+            return cls._get_occasional_budget_candidates(qs, pivot_date)
 
         items = (
             qs.filter(
@@ -706,7 +708,106 @@ class BudgetService:
         return output
 
     @classmethod
-    def duplicate_budget(cls, budgets: List[Dict[str, int]], workspace: Workspace):
+    def _get_occasional_budget_candidates(
+        cls, qs, pivot_date: str | None = None
+    ) -> list[dict[datetime.date, str]]:
+        mapping = RECURRENT_TYPE_MAPPING[BudgetDuplicateType.OCCASIONAL]
+
+        # Look back 6 months for occasional budgets instead of just previous period
+        lookback_start = mapping["start_date"](pivot_date) - relativedelta(
+            months=mapping["lookback_months"]
+        )
+        lookback_end = mapping["end_date"](pivot_date)
+
+        # Get all occasional budgets from the last 6 months
+        historical_items = (
+            qs.filter(
+                recurrent=BudgetDuplicateType.OCCASIONAL,
+                budget_date__gte=lookback_start,
+                budget_date__lte=lookback_end,
+            )
+            .prefetch_related("currency")
+            .order_by("budget_date")
+        )
+
+        # Group by title to get unique budget types
+        unique_titles = set(historical_items.values_list("title", flat=True))
+
+        # Calculate usage for each unique title
+        usage_end_date = mapping["end_date"]()
+        usage_start_date = usage_end_date - mapping["relative_usage"]
+
+        transactions = Transaction.objects.filter(
+            budget__title__in=unique_titles,
+            transaction_date__gte=usage_start_date,
+            transaction_date__lte=usage_end_date,
+        ).select_related("multicurrency", "budget__currency")
+
+        output = []
+        upcoming_date = mapping["start_date"](pivot_date) + mapping["relative_date"]
+
+        for title in unique_titles:
+            # Get the most recent budget with this title for reference
+            recent_budget = historical_items.filter(title=title).last()
+
+            # Check if budget already exists for upcoming period
+            existing_item = Budget.objects.filter(
+                title=title,
+                budget_date=upcoming_date,
+            )
+
+            if not existing_item.exists():
+                # Calculate average amount from historical usage
+                usage_sum = (
+                    transactions.filter(budget__title=title)
+                    .values("budget__uuid", "budget__title")
+                    .annotate(
+                        total_in_currency=Round(
+                            Sum(
+                                Coalesce(
+                                    Cast(
+                                        KeyTextTransform(
+                                            recent_budget.currency.code,
+                                            "multicurrency__amount_map",
+                                        ),
+                                        FloatField(),
+                                    ),
+                                    Value(0, output_field=FloatField()),
+                                )
+                            ),
+                            2,
+                        )
+                    )
+                )
+
+                all_sums = [value["total_in_currency"] for value in usage_sum]
+
+                # Use weighted average: recent transactions have higher weight
+                if all_sums:
+                    # Get frequency (how many months had this expense)
+                    months_with_expense = len(all_sums)
+                    total_months = mapping["lookback_months"]
+                    frequency_factor = months_with_expense / total_months
+
+                    # Calculate weighted average with frequency consideration
+                    avg_sum = round(sum(all_sums) / len(all_sums) * frequency_factor, 2)
+                else:
+                    avg_sum = recent_budget.amount
+
+                output.append(
+                    {
+                        "uuid": recent_budget.uuid,
+                        "date": upcoming_date,
+                        "title": title,
+                        "amount": avg_sum,
+                        "currency": recent_budget.currency.sign,
+                    }
+                )
+
+        return output
+
+    @classmethod
+    def duplicate_budget(cls, budgets: list[dict[str, int]], workspace: Workspace):
         for budget in budgets:
             budget_item = Budget.objects.get(uuid=budget["uuid"])
             upcoming_item_date = (budget_item.budget_date) + RECURRENT_TYPE_MAPPING[
@@ -741,8 +842,8 @@ class BudgetService:
         month: datetime.date,
         category_uuid: str,
         user: User,
-        filter_by_user: Optional[str] = None,
-    ) -> List[MonthUsageSum]:
+        filter_by_user: str | None = None,
+    ) -> list[MonthUsageSum]:
         currency_code = user.currency_code()
         if not currency_code:
             return
@@ -784,7 +885,7 @@ class BudgetService:
         )
 
         # add empty months with 0 amount
-        clean_transactions: List[MonthUsageSum] = []
+        clean_transactions: list[MonthUsageSum] = []
         for current_month in all_months:
             if transaction := grouped_transactions.filter(month=current_month).first():
                 amount = transaction.get("amount", 0)

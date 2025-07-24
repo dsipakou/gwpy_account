@@ -9,6 +9,7 @@ class Budget(models.Model):
     RECURRENT_CHOICES = (
         (BudgetDuplicateType.WEEKLY.value, "Weekly"),
         (BudgetDuplicateType.MONTHLY.value, "Monthly"),
+        (BudgetDuplicateType.OCCASIONAL.value, "Occasional"),
     )
 
     uuid = models.UUIDField(unique=True, default=uuid.uuid4, editable=False)

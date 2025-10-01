@@ -178,3 +178,4 @@ class DuplicateResponseSerializer(serializers.Serializer):
     title = serializers.CharField()
     amount = serializers.FloatField()
     currency = serializers.CharField()
+    recurrent = serializers.CharField()

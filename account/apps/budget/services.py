@@ -303,11 +303,11 @@ class BudgetService:
         print(datetime.datetime.now() - tt)
 
         # Prepare output list
-        output = [category for category in categories_map.values()]
+        output = list(categories_map.values())
         for cat in output:
-            cat.budgets = [val for val in cat.budgets_map.values()]
+            cat.budgets = list(cat.budgets_map.values())
             for bud in cat.budgets:
-                bud.items = [val for val in bud.items_map.values()]
+                bud.items = list(bud.items_map.values())
 
         print("---------------------")
         print("---- End  ---")
@@ -413,7 +413,7 @@ class BudgetService:
         cls, currency_qs: QuerySet, categories, latest_rates
     ) -> list[CategoryItem]:
         categories_list = []
-        eval_categories = [category for category in categories]
+        eval_categories = list(categories)
         available_currencies = currency_qs.values("code", "is_base")
         base_currency = available_currencies.get(is_base=True)["code"]
         for category in eval_categories:
@@ -630,19 +630,16 @@ class BudgetService:
         if RECURRENT_TYPE_MAPPING.get(recurrent_type) is None:
             raise UnsupportedDuplicateTypeError
 
-        # For OCCASIONAL type, we need broader search criteria
-        if recurrent_type == BudgetDuplicateType.OCCASIONAL:
-            return cls._get_occasional_budget_candidates(qs, pivot_date)
+        start_date = RECURRENT_TYPE_MAPPING[recurrent_type]["start_date"](pivot_date)
+        end_date = RECURRENT_TYPE_MAPPING[recurrent_type]["end_date"](pivot_date)
 
         items = (
             qs.filter(
-                recurrent=recurrent_type,
-                budget_date__gte=RECURRENT_TYPE_MAPPING[recurrent_type]["start_date"](
-                    pivot_date
-                ),
-                budget_date__lte=RECURRENT_TYPE_MAPPING[recurrent_type]["end_date"](
-                    pivot_date
-                ),
+                Q(recurrent=BudgetDuplicateType.OCCASIONAL.value)
+                | (
+                    Q(recurrent=recurrent_type)
+                    & Q(budget_date__range=(start_date, end_date))
+                )
             )
             .prefetch_related("currency")
             .order_by("budget_date")
@@ -691,8 +688,10 @@ class BudgetService:
                 + RECURRENT_TYPE_MAPPING[recurrent_type]["relative_date"]
             )
             existing_item = Budget.objects.filter(
-                title=item.title,
-                budget_date=upcoming_item_date,
+                Q(
+                    title=item.title,
+                    budget_date=upcoming_item_date,
+                )
             )
             if not existing_item.exists():
                 output.append(
@@ -702,105 +701,7 @@ class BudgetService:
                         "title": item.title,
                         "amount": avg_sum,
                         "currency": item.currency.sign,
-                    }
-                )
-
-        return output
-
-    @classmethod
-    def _get_occasional_budget_candidates(
-        cls, qs, pivot_date: str | None = None
-    ) -> list[dict[datetime.date, str]]:
-        mapping = RECURRENT_TYPE_MAPPING[BudgetDuplicateType.OCCASIONAL]
-
-        # Look back 6 months for occasional budgets instead of just previous period
-        lookback_start = mapping["start_date"](pivot_date) - relativedelta(
-            months=mapping["lookback_months"]
-        )
-        lookback_end = mapping["end_date"](pivot_date)
-
-        # Get all occasional budgets from the last 6 months
-        historical_items = (
-            qs.filter(
-                recurrent=BudgetDuplicateType.OCCASIONAL,
-                budget_date__gte=lookback_start,
-                budget_date__lte=lookback_end,
-            )
-            .prefetch_related("currency")
-            .order_by("budget_date")
-        )
-
-        # Group by title to get unique budget types
-        unique_titles = set(historical_items.values_list("title", flat=True))
-
-        # Calculate usage for each unique title
-        usage_end_date = mapping["end_date"]()
-        usage_start_date = usage_end_date - mapping["relative_usage"]
-
-        transactions = Transaction.objects.filter(
-            budget__title__in=unique_titles,
-            transaction_date__gte=usage_start_date,
-            transaction_date__lte=usage_end_date,
-        ).select_related("multicurrency", "budget__currency")
-
-        output = []
-        upcoming_date = mapping["start_date"](pivot_date) + mapping["relative_date"]
-
-        for title in unique_titles:
-            # Get the most recent budget with this title for reference
-            recent_budget = historical_items.filter(title=title).last()
-
-            # Check if budget already exists for upcoming period
-            existing_item = Budget.objects.filter(
-                title=title,
-                budget_date=upcoming_date,
-            )
-
-            if not existing_item.exists():
-                # Calculate average amount from historical usage
-                usage_sum = (
-                    transactions.filter(budget__title=title)
-                    .values("budget__uuid", "budget__title")
-                    .annotate(
-                        total_in_currency=Round(
-                            Sum(
-                                Coalesce(
-                                    Cast(
-                                        KeyTextTransform(
-                                            recent_budget.currency.code,
-                                            "multicurrency__amount_map",
-                                        ),
-                                        FloatField(),
-                                    ),
-                                    Value(0, output_field=FloatField()),
-                                )
-                            ),
-                            2,
-                        )
-                    )
-                )
-
-                all_sums = [value["total_in_currency"] for value in usage_sum]
-
-                # Use weighted average: recent transactions have higher weight
-                if all_sums:
-                    # Get frequency (how many months had this expense)
-                    months_with_expense = len(all_sums)
-                    total_months = mapping["lookback_months"]
-                    frequency_factor = months_with_expense / total_months
-
-                    # Calculate weighted average with frequency consideration
-                    avg_sum = round(sum(all_sums) / len(all_sums) * frequency_factor, 2)
-                else:
-                    avg_sum = recent_budget.amount
-
-                output.append(
-                    {
-                        "uuid": recent_budget.uuid,
-                        "date": upcoming_date,
-                        "title": title,
-                        "amount": avg_sum,
-                        "currency": recent_budget.currency.sign,
+                        "recurrent": item.recurrent,
                     }
                 )
 

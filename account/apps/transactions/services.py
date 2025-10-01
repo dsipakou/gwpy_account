@@ -7,12 +7,17 @@ from categories import constants as category_constants
 from django.db.models import QuerySet
 from rates.models import Rate
 from rates.utils import generate_amount_map
-from transactions.entities import (GroupedByCategory, GroupedByMonth,
-                                   GroupedByParent, TransactionAccountDetails,
-                                   TransactionBudgetDetails,
-                                   TransactionCategoryDetails,
-                                   TransactionCurrencyDetails, TransactionItem,
-                                   TransactionSpentInCurrencyDetails)
+from transactions.entities import (
+    GroupedByCategory,
+    GroupedByMonth,
+    GroupedByParent,
+    TransactionAccountDetails,
+    TransactionBudgetDetails,
+    TransactionCategoryDetails,
+    TransactionCurrencyDetails,
+    TransactionItem,
+    TransactionSpentInCurrencyDetails,
+)
 from transactions.models import Transaction, TransactionMulticurrency
 from workspaces.models import Workspace
 
@@ -39,12 +44,16 @@ class TransactionService:
     def get_transaction(cls, transaction: Transaction) -> Optional[Transaction]:
         category_details = TransactionCategoryDetails(
             name=transaction.category.name,
-            parent=transaction.category.parent.uuid
-            if transaction.category.type == category_constants.EXPENSE
-            else "",
-            parent_name=transaction.category.parent.name
-            if transaction.category.type == category_constants.EXPENSE
-            else "",
+            parent=(
+                transaction.category.parent.uuid
+                if transaction.category.type == category_constants.EXPENSE
+                else ""
+            ),
+            parent_name=(
+                transaction.category.parent.name
+                if transaction.category.type == category_constants.EXPENSE
+                else ""
+            ),
         )
         account_details = TransactionAccountDetails(
             title=transaction.account.title,
@@ -101,9 +110,9 @@ class TransactionService:
                     "spent_in_currencies": transaction_details["spent_in_currencies"],
                 }
             else:
-                grouped_by_month[formatted_date][
-                    "spent_in_base_currency"
-                ] += transaction_details["spent_in_base_currency"]
+                grouped_by_month[formatted_date]["spent_in_base_currency"] += (
+                    transaction_details["spent_in_base_currency"]
+                )
                 for currency in grouped_by_month[formatted_date]["spent_in_currencies"]:
                     grouped_by_month[formatted_date]["spent_in_currencies"][
                         currency
@@ -132,16 +141,16 @@ class TransactionService:
 
             grouped_by_category[category_name]["items"].append(transaction_details)
 
-            grouped_by_category[category_name][
-                "spent_in_base_currency"
-            ] += transaction_details["spent_in_base_currency"]
+            grouped_by_category[category_name]["spent_in_base_currency"] += (
+                transaction_details["spent_in_base_currency"]
+            )
 
             for currency, value in grouped_by_category[category_name][
                 "spent_in_currencies"
             ].items():
-                grouped_by_category[category_name]["spent_in_currencies"][
-                    currency
-                ] += value
+                grouped_by_category[category_name]["spent_in_currencies"][currency] += (
+                    value
+                )
         return grouped_by_category
 
     @classmethod

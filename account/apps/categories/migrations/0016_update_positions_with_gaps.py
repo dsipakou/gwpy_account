@@ -21,7 +21,6 @@ def update_positions_with_gaps(apps, schema_editor):
         num_sub_categories = subcategories.count()
         step = 100
         if num_sub_categories > 0:
-
             # Assign new positions with gaps
             for index, subcategory in enumerate(subcategories):
                 new_position = (num_sub_categories - (index + 1)) * step
@@ -46,7 +45,6 @@ def reverse_update_positions(apps, schema_editor):
 
 
 class Migration(migrations.Migration):
-
     dependencies = [
         ("categories", "0015_category_categories__parent__14ef2b_idx"),
     ]

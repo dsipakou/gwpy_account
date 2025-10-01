@@ -4,7 +4,6 @@ from django.db import migrations
 
 
 class Migration(migrations.Migration):
-
     dependencies = [
         ("workspaces", "0004_alter_workspace_owner"),
         ("currencies", "0005_alter_currency_code_alter_currency_unique_together"),

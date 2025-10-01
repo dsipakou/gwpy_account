@@ -30,7 +30,6 @@ def reverse_assign_positions(apps, schema_editor):
 
 
 class Migration(migrations.Migration):
-
     dependencies = [
         ("categories", "0013_alter_category_options_and_more"),
     ]

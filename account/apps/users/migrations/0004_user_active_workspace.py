@@ -5,7 +5,6 @@ from django.db import migrations, models
 
 
 class Migration(migrations.Migration):
-
     dependencies = [
         ("workspaces", "0002_workspace_uuid_alter_workspace_members"),
         ("users", "0003_alter_user_email_alter_user_first_name_and_more"),

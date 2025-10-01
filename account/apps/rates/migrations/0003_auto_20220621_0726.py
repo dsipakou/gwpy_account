@@ -12,7 +12,6 @@ def set_base_currency(apps, schema_editor):
 
 
 class Migration(migrations.Migration):
-
     dependencies = [
         ("rates", "0002_rate_base_currency"),
     ]

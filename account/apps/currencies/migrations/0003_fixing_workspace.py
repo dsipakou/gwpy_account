@@ -12,7 +12,6 @@ def fix_workspace(apps, schema_editor):
 
 
 class Migration(migrations.Migration):
-
     dependencies = [
         ("currencies", "0002_currency_workspace"),
     ]

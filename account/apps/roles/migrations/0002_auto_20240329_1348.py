@@ -16,7 +16,6 @@ def create_default_roles(apps, schema_editor):
 
 
 class Migration(migrations.Migration):
-
     dependencies = [
         ("roles", "0001_initial"),
     ]

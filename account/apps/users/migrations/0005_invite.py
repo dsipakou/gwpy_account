@@ -8,7 +8,6 @@ from django.db import migrations, models
 
 
 class Migration(migrations.Migration):
-
     dependencies = [
         ("workspaces", "0004_alter_workspace_owner"),
         ("users", "0004_user_active_workspace"),

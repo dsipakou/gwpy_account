@@ -5,7 +5,6 @@ from django.db import migrations, models
 
 
 class Migration(migrations.Migration):
-
     dependencies = [
         ("currencies", "0001_initial"),
         ("rates", "0003_auto_20220621_0726"),

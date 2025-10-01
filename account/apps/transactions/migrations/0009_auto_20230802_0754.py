@@ -14,7 +14,6 @@ def set_default_workspace(apps, schema_editor):
 
 
 class Migration(migrations.Migration):
-
     dependencies = [
         ("transactions", "0008_transaction_workspace"),
     ]

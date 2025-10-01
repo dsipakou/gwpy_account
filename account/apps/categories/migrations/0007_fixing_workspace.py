@@ -12,7 +12,6 @@ def fix_workspace(apps, schema_editor):
 
 
 class Migration(migrations.Migration):
-
     dependencies = [
         ("categories", "0006_category_workspace"),
     ]

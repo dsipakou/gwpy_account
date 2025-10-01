@@ -5,7 +5,6 @@ from django.db import migrations, models
 
 
 class Migration(migrations.Migration):
-
     dependencies = [
         ("workspaces", "0002_workspace_uuid_alter_workspace_members"),
         ("categories", "0007_fixing_workspace"),

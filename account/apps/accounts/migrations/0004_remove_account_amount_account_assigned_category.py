@@ -5,7 +5,6 @@ from django.db import migrations, models
 
 
 class Migration(migrations.Migration):
-
     dependencies = [
         ("categories", "0005_remove_category_is_income"),
         ("accounts", "0003_remove_account_orig_pk"),

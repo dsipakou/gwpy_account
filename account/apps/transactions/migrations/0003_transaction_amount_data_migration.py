@@ -44,7 +44,6 @@ def generate_transaction_pricing(apps, schema_editor):
 
 
 class Migration(migrations.Migration):
-
     dependencies = [
         ("transactions", "0002_transactionamount"),
         ("workspaces", "0001_initial"),

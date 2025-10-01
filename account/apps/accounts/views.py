@@ -8,9 +8,12 @@ from django.db.models import FloatField, Q, Sum, Value
 from django.db.models.fields.json import KeyTextTransform
 from django.db.models.functions import Cast, Coalesce, TruncMonth
 from rest_framework import status
-from rest_framework.generics import (CreateAPIView, ListCreateAPIView,
-                                     RetrieveUpdateDestroyAPIView,
-                                     ValidationError)
+from rest_framework.generics import (
+    CreateAPIView,
+    ListCreateAPIView,
+    RetrieveUpdateDestroyAPIView,
+    ValidationError,
+)
 from rest_framework.response import Response
 from transactions.models import Transaction
 from users.filters import FilterByUser

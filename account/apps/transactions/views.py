@@ -7,23 +7,29 @@ from django.db import transaction
 from django.db.models.query import QuerySet
 from django.utils.timezone import now
 from rest_framework import status
-from rest_framework.generics import (CreateAPIView, ListAPIView,
-                                     ListCreateAPIView, RetrieveDestroyAPIView,
-                                     UpdateAPIView)
+from rest_framework.generics import (
+    CreateAPIView,
+    ListAPIView,
+    ListCreateAPIView,
+    RetrieveDestroyAPIView,
+    UpdateAPIView,
+)
 from rest_framework.response import Response
 from transactions.models import LastViewed, Transaction
-from transactions.serializers import (AccountUsageSerializer,
-                                      GroupedTransactionSerializer,
-                                      IncomeSerializer,
-                                      ReportByMonthSerializer,
-                                      ReportChartSerializer,
-                                      TransactionBulkCreateSerializer,
-                                      TransactionBulkSerializer,
-                                      TransactionBulkUpdateSerializer,
-                                      TransactionCreateSerializer,
-                                      TransactionDetailsSerializer,
-                                      TransactionSerializer,
-                                      TransactionUpdateSerializer)
+from transactions.serializers import (
+    AccountUsageSerializer,
+    GroupedTransactionSerializer,
+    IncomeSerializer,
+    ReportByMonthSerializer,
+    ReportChartSerializer,
+    TransactionBulkCreateSerializer,
+    TransactionBulkSerializer,
+    TransactionBulkUpdateSerializer,
+    TransactionCreateSerializer,
+    TransactionDetailsSerializer,
+    TransactionSerializer,
+    TransactionUpdateSerializer,
+)
 from transactions.services import ReportService, TransactionService
 from users.filters import FilterByUser
 from workspaces.filters import FilterByWorkspace

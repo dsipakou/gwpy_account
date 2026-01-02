@@ -19,6 +19,7 @@ dependencies = [
     "django-environ<1.0.0,>=0.10.0",
     "whitenoise<7.0.0,>=6.5.0",
     "pydantic<3.0.0,>=2.5.3",
+    "structlog>=25.5.0",
 ]
 
 [dependency-groups]
@@ -43,6 +44,7 @@ select = [
     "B",   # flake8-bugbear
     "C4",  # flake8-comprehensions
 ]
+ignore = ["E501"]
 
 [tool.ruff.lint.isort]
 # Configure import sorting (isort replacement)

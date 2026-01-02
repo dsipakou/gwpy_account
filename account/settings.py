@@ -16,6 +16,7 @@ import sys
 from pathlib import Path
 
 import environ
+import structlog
 from django.core.management.utils import get_random_secret_key
 
 env = environ.Env(
@@ -210,10 +211,20 @@ logging.basicConfig(level=LOG_LEVEL)
 LOGGING = {
     "version": 1,
     "disable_existing_loggers": False,
+    "formatters": {
+        "plain": {
+            "()": structlog.stdlib.ProcessorFormatter,
+            "processors": [
+                structlog.stdlib.ProcessorFormatter.remove_processors_meta,
+                structlog.dev.ConsoleRenderer(),
+            ],
+        },
+    },
     "handlers": {
         "stream": {
             "class": "logging.StreamHandler",
             "level": LOG_LEVEL,
+            "formatter": "plain",
         }
     },
     "root": {
@@ -228,6 +239,24 @@ LOGGING = {
         },
     },
 }
+
+# Structlog configuration
+structlog.configure(
+    processors=[
+        structlog.contextvars.merge_contextvars,
+        structlog.stdlib.filter_by_level,
+        structlog.processors.TimeStamper(fmt="iso"),
+        structlog.stdlib.add_logger_name,
+        structlog.stdlib.add_log_level,
+        structlog.processors.StackInfoRenderer(),
+        structlog.processors.format_exc_info,
+        structlog.processors.UnicodeDecoder(),
+        structlog.stdlib.ProcessorFormatter.wrap_for_formatter,
+    ],
+    logger_factory=structlog.stdlib.LoggerFactory(),
+    wrapper_class=structlog.stdlib.BoundLogger,
+    cache_logger_on_first_use=True,
+)
 
 PROJECT_ROOT = os.path.dirname(__file__)
 sys.path.insert(0, os.path.join(PROJECT_ROOT, "apps"))

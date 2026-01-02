@@ -1,4 +1,3 @@
-from currencies.models import Currency
 from django.contrib.auth import authenticate
 from rest_framework import status
 from rest_framework.authtoken.models import Token
@@ -12,6 +11,8 @@ from rest_framework.generics import (
 )
 from rest_framework.permissions import AllowAny
 from rest_framework.response import Response
+
+from currencies.models import Currency
 from roles.models import Role, UserRole
 from users.entities import UserSchema
 from users.filters import FilterByUser

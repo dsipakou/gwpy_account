@@ -1,6 +1,7 @@
-from categories.models import Category
 from rest_framework import serializers
 from rest_framework.fields import MinValueValidator
+
+from categories.models import Category
 
 
 class CategorySerializer(serializers.ModelSerializer):

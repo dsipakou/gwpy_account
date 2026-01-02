@@ -1,8 +1,9 @@
 import csv
 import uuid
 
-from accounts.models import Account
 from django.core.management.base import BaseCommand
+
+from accounts.models import Account
 from users.models import User
 
 

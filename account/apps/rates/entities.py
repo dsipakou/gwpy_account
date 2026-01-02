@@ -1,5 +1,5 @@
 from datetime import date
-from typing import List, TypedDict
+from typing import TypedDict
 
 from pydantic import BaseModel
 
@@ -13,7 +13,7 @@ class BatchedRateRequest(TypedDict):
     base_currency: str
     rate_date: str
     user: str
-    items: List[RateItem]
+    items: list[RateItem]
 
 
 class RateOnDate(BaseModel):

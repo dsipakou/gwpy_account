@@ -1,5 +1,4 @@
 import datetime
-from typing import Dict, List, Union
 
 from budget.models import Budget
 from currencies.models import Currency
@@ -14,10 +13,10 @@ def generate_date_seq(days_count):
 
 
 def generate_amount_map(
-    instance: Union[Transaction, Budget],
-    rates: List[Rate],
+    instance: Transaction | Budget,
+    rates: list[Rate],
     workspace,
-) -> Dict[str, int]:
+) -> dict[str, int]:
     amount_mapping = {}
     rate_map = {}
     for rate in rates:

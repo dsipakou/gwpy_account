@@ -1,7 +1,8 @@
 import uuid
 
-from categories import constants
 from django.db import models
+
+from categories import constants
 
 
 class Category(models.Model):

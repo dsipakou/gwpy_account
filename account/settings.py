@@ -20,6 +20,7 @@ from django.core.management.utils import get_random_secret_key
 
 env = environ.Env(
     DEBUG=(bool, False),
+    LOG_LEVEL=(str, "INFO"),
     DB_NAME=(str, "mspy_account"),
     DB_USER=(str, "mspy_account"),
     DB_PASSWORD=(str, "mspy_account"),
@@ -202,7 +203,9 @@ REST_FRAMEWORK = {
 
 DEFAULT_AUTO_FIELD = "django.db.models.BigAutoField"
 
-logging.basicConfig(level=logging.INFO)
+LOG_LEVEL = env("LOG_LEVEL")
+
+logging.basicConfig(level=LOG_LEVEL)
 
 LOGGING = {
     "version": 1,
@@ -210,13 +213,18 @@ LOGGING = {
     "handlers": {
         "stream": {
             "class": "logging.StreamHandler",
-            "level": "DEBUG",
+            "level": LOG_LEVEL,
         }
+    },
+    "root": {
+        "handlers": ["stream"],
+        "level": LOG_LEVEL,
     },
     "loggers": {
         "django.db.backends": {
             "handlers": ["stream"],
-            "level": "DEBUG",
+            "level": LOG_LEVEL,
+            "propagate": False,
         },
     },
 }

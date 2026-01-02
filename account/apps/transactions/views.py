@@ -48,7 +48,7 @@ class TransactionList(ListCreateAPIView, UpdateAPIView):
         if limit := request.GET.get("limit"):
             try:
                 data["limit"] = int(limit)
-            except:
+            except Exception:
                 pass
 
         queryset = self.filter_queryset(self.get_queryset())
@@ -296,7 +296,6 @@ class TransactionIncomeList(ListAPIView):
             transaction_date__gte=date_from,
             transaction_date__lte=date_to,
         ).select_related("multicurrency")
-        data = TransactionService.group_by_month(transactions)
         serializer = self.get_serializer(instance=transactions, many=True)
         return Response(serializer.data)
 

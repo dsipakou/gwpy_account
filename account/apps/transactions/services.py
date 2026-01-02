@@ -28,7 +28,7 @@ class TransactionService:
     def create_transaction_multicurrency_amount(
         cls, uuids: list[UUID], workspace: Workspace
     ):
-        amount_mapping = dict()
+        amount_mapping = {}
         transactions = Transaction.objects.select_related("currency").filter(
             uuid__in=uuids, workspace=workspace
         )

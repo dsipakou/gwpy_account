@@ -2,12 +2,10 @@
 
 from django.db import migrations
 
-from budget.models import Budget
 from rates.models import Rate
 
 
 def generate_budget_pricing(apps, schema_editor):
-    qs = Budget.objects.all()
     BudgetAmount = apps.get_model("transactions", "TransactionAmount")
     for budget in []:
         rates_on_date = Rate.objects.filter(
@@ -29,10 +27,10 @@ def generate_budget_pricing(apps, schema_editor):
 
         # Create a record for base currency as well
         if budget.currency.is_base:
-            budget_amounts_map[budget.currency.code]: budget.amount
+            budget_amounts_map[budget.currency.code] = budget.amount
         elif rates_on_date:
             amount = budget.amount * rates_on_date.get(currency=budget.currency).rate
-            budget_amounts_map[rates_on_date[0].base_currency.code]: round(amount, 5)
+            budget_amounts_map[rates_on_date[0].base_currency.code] = round(amount, 5)
 
         BudgetAmount.objects.update_or_create(
             budget=budget, defaults={"amount_map": budget_amounts_map}

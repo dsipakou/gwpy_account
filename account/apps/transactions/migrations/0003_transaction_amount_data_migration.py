@@ -14,7 +14,7 @@ def generate_transaction_pricing(apps, schema_editor):
         rates_on_date = Rate.objects.filter(
             rate_date=transaction.transaction_date
         ).prefetch_related("currency")
-        amount_mapping = dict()
+        amount_mapping = {}
         for rate in rates_on_date:
             if transaction.currency == rate.currency:
                 # current rate currency and transaction currency are the same no need to modify amount

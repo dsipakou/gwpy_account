@@ -1,5 +1,6 @@
 import datetime
 
+import structlog
 from rest_framework import status
 from rest_framework.exceptions import ValidationError
 from rest_framework.generics import (
@@ -20,6 +21,8 @@ from transactions.models import Transaction
 from users.filters import FilterByUser
 from users.permissions import BaseUserPermission
 from workspaces.filters import FilterByWorkspace
+
+logger = structlog.get_logger()
 
 
 class BudgetList(ListCreateAPIView):
@@ -106,6 +109,7 @@ class MonthlyUsageBudgetList(ListAPIView):
         )
 
         serializer = self.get_serializer(categories, many=True)
+        logger.info("Monthly usage requested", date_from=date_from, date_to=date_to)
         return Response(serializer.data)
 
 

@@ -270,7 +270,7 @@ class CategoryModel(pydantic.BaseModel):
     uuid: UUID
     category_name: str
     budgets: list[GroupedBudgetModel] = pydantic.Field(default_factory=list)
-    budgets_map: dict[UUID, GroupedBudgetModel] = pydantic.Field(default_factory=dict)
+    budgets_map: dict[str, GroupedBudgetModel] = pydantic.Field(default_factory=dict)
     planned: float = pydantic.Field(ge=0, default=0)
     spent: float = pydantic.Field(ge=0, default=0)
     planned_in_currencies: dict[str, float] = pydantic.Field(default_factory=dict)

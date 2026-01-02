@@ -1,7 +1,7 @@
 import datetime
-import logging
 from uuid import UUID
 
+import structlog
 from dateutil.relativedelta import relativedelta
 from dateutil.rrule import MONTHLY, rrule
 from django.db.models import Count, FloatField, Prefetch, Q, QuerySet, Sum, Value
@@ -53,7 +53,7 @@ RECURRENT_TYPE_MAPPING = {
     },
 }
 
-logger = logging.getLogger(__name__)
+logger = structlog.get_logger()
 
 
 class BudgetService:
@@ -92,10 +92,6 @@ class BudgetService:
         date_to: str,
         user: str | None,
     ):
-        print("----------------------")
-        print("----- start here -----")
-        print("----------------------")
-        tt = datetime.datetime.now()
         budgets = (
             budgets_qs.filter(budget_date__lte=date_to, budget_date__gte=date_from)
             .select_related("currency", "category", "multicurrency", "user")
@@ -134,11 +130,6 @@ class BudgetService:
             categories_map[category.uuid] = CategoryModel.init(
                 category, available_currencies
             )
-
-        print("---------------------")
-        print("---- Category create ---")
-        print("---------------------")
-        print(datetime.datetime.now() - tt)
 
         # Create grouped budgets with budgets inside for corresponding categories
         # Counting only planned values here
@@ -179,11 +170,6 @@ class BudgetService:
             category_for_budget.update_planned_values(
                 available_currencies, budget.multicurrency_map
             )
-
-        print("---------------------")
-        print("---- Budget create ---")
-        print("---------------------")
-        print(datetime.datetime.now() - tt)
 
         # Fill in budgets spendings
         for transaction in transactions:
@@ -297,11 +283,6 @@ class BudgetService:
                 if transaction_category != transaction_budget_category:
                     simple_budget_budget_item.transactions.append(transaction_model)
 
-        print("---------------------")
-        print("---- Transaction create ---")
-        print("---------------------")
-        print(datetime.datetime.now() - tt)
-
         # Prepare output list
         output = list(categories_map.values())
         for cat in output:
@@ -309,10 +290,6 @@ class BudgetService:
             for bud in cat.budgets:
                 bud.items = list(bud.items_map.values())
 
-        print("---------------------")
-        print("---- End  ---")
-        print("---------------------")
-        print(datetime.datetime.now() - tt)
         return [item.dict() for item in output]
 
     @classmethod

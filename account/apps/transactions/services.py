@@ -1,10 +1,11 @@
 import copy
 import datetime
-from typing import Dict, List, Optional, Union
+from typing import Literal
 from uuid import UUID
 
-from categories import constants as category_constants
 from django.db.models import QuerySet
+
+from categories import constants as category_constants
 from rates.models import Rate
 from rates.utils import generate_amount_map
 from transactions.entities import (
@@ -25,7 +26,7 @@ from workspaces.models import Workspace
 class TransactionService:
     @classmethod
     def create_transaction_multicurrency_amount(
-        cls, uuids: List[UUID], workspace: Workspace
+        cls, uuids: list[UUID], workspace: Workspace
     ):
         amount_mapping = dict()
         transactions = Transaction.objects.select_related("currency").filter(
@@ -41,7 +42,7 @@ class TransactionService:
             )
 
     @classmethod
-    def get_transaction(cls, transaction: Transaction) -> Optional[Transaction]:
+    def get_transaction(cls, transaction: Transaction) -> Transaction | None:
         category_details = TransactionCategoryDetails(
             name=transaction.category.name,
             parent=(
@@ -93,7 +94,7 @@ class TransactionService:
         )
 
     @classmethod
-    def group_by_month(cls, transactions: List[Transaction]) -> List[GroupedByMonth]:
+    def group_by_month(cls, transactions: list[Transaction]) -> list[GroupedByMonth]:
         grouped_by_month = {}
         for transaction in transactions:
             transaction_details: TransactionItem = cls.get_transaction(transaction)
@@ -155,7 +156,7 @@ class TransactionService:
 
     @classmethod
     def group_by_parent(
-        cls, grouped_by_category: Dict[str, GroupedByCategory]
+        cls, grouped_by_category: dict[str, GroupedByCategory]
     ) -> GroupedByParent:
         grouped_by_parent = {}
         for _, category in sorted(grouped_by_category.items()):
@@ -193,12 +194,10 @@ class TransactionService:
         *,
         limit: int = 15,
         order_by: str = "created_at",
-        category_type: Union[
-            category_constants.INCOME, category_constants.EXPENSE
-        ] = category_constants.EXPENSE,
-        date_from: Optional[str] = None,
-        date_to: Optional[str] = None,
-    ) -> List[TransactionItem]:
+        category_type: Literal["INC", "EXP"] = category_constants.EXPENSE,
+        date_from: str | None = None,
+        date_to: str | None = None,
+    ) -> list[TransactionItem]:
         qs = queryset.filter(category__type=category_type).select_related("category")
 
         if date_from and date_to:
@@ -217,7 +216,7 @@ class TransactionService:
     def proceed_transactions(
         cls,
         queryset: QuerySet,
-    ) -> List[TransactionItem]:
+    ) -> list[TransactionItem]:
         transactions = []
         for transaction in queryset:
             transactions.append(cls.get_transaction(transaction))
@@ -225,8 +224,8 @@ class TransactionService:
 
     @classmethod
     def load_grouped_transactions(
-        cls, queryset, *, date_from: Optional[str] = None, date_to: Optional[str] = None
-    ) -> List[GroupedByParent]:
+        cls, queryset, *, date_from: str | None = None, date_to: str | None = None
+    ) -> list[GroupedByParent]:
         qs = queryset.order_by("-created_at")
         if date_from:
             qs = qs.filter(transaction_date__gte=date_from)
@@ -259,7 +258,7 @@ class ReportService:
         date_from: str,
         date_to: str,
         currency_code: str,
-        till_day: Optional[int] = None,
+        till_day: int | None = None,
     ):
         grouped_transactions = Transaction.grouped_by_month_and_category(
             qs, date_from, date_to, currency_code, till_day

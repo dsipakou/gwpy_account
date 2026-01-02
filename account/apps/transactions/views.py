@@ -1,8 +1,6 @@
 import functools
 from datetime import date, datetime, timedelta
 
-from categories import constants
-from categories.models import Category
 from django.db import transaction
 from django.db.models.query import QuerySet
 from django.utils.timezone import now
@@ -15,6 +13,10 @@ from rest_framework.generics import (
     UpdateAPIView,
 )
 from rest_framework.response import Response
+
+from account.apps.transactions.serializers import LastViewedSerializer
+from categories import constants
+from categories.models import Category
 from transactions.models import LastViewed, Transaction
 from transactions.serializers import (
     AccountUsageSerializer,
@@ -33,8 +35,6 @@ from transactions.serializers import (
 from transactions.services import ReportService, TransactionService
 from users.filters import FilterByUser
 from workspaces.filters import FilterByWorkspace
-
-from account.apps.transactions.serializers import LastViewedSerializer
 
 
 class TransactionList(ListCreateAPIView, UpdateAPIView):

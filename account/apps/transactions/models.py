@@ -1,15 +1,15 @@
 import datetime
 import textwrap
 import uuid
-from typing import Optional
 
-from categories import constants as category_constants
-from currencies.models import Currency
 from django.db import connection, models
 from django.db.models import QuerySet
 from django.db.models.fields.json import KeyTextTransform
 from django.db.models.functions import Cast, Trunc
 from django.db.models.functions.datetime import TruncMonth
+
+from categories import constants as category_constants
+from currencies.models import Currency
 from rates.models import Rate
 from transactions.utils import dictfetchall
 from users.models import User
@@ -36,6 +36,7 @@ class Transaction(models.Model):
     )
     description = models.CharField(max_length=255, blank=True)
     transaction_date = models.DateField()
+    source = models.CharField(max_length=100, blank=True, null=True)
     created_at = models.DateTimeField(auto_now_add=True)
     modified_at = models.DateTimeField(auto_now=True)
 
@@ -132,7 +133,7 @@ class Transaction(models.Model):
         date_from: str,
         date_to: str,
         currency_code: str,
-        till_day: Optional[int],
+        till_day: int | None,
     ):
         filtered_qs = (
             qs.select_related("category", "category__parent", "multicurrency")

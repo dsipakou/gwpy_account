@@ -46,7 +46,7 @@ def generate_amount_map(
     # Create a record for base currency as well
     if rate_map:
         # if instance currency is already base currency - save it as is
-        base_currency = [_ for _ in rate_map.values()][0].base_currency
+        base_currency = next(iter(rate_map.values())).base_currency
         if instance.currency.uuid == base_currency.uuid:
             amount_mapping[instance.currency.code] = instance.amount
         else:

@@ -1,6 +1,7 @@
 import datetime
 
 import structlog
+from dateutil.relativedelta import relativedelta
 from django.db import transaction
 from rest_framework import status
 from rest_framework.exceptions import ValidationError
@@ -13,6 +14,7 @@ from rest_framework.generics import (
 from rest_framework.response import Response
 
 from budget import serializers
+from budget.constants import BudgetDuplicateType
 from budget.models import Budget, BudgetSeriesException, BudgetSeries
 from budget.serializers import DuplicateResponseSerializer
 from budget.services import BudgetService
@@ -71,15 +73,134 @@ class BudgetDetails(RetrieveUpdateDestroyAPIView):
 
     @transaction.atomic
     def perform_update(self, serializer):
-        """Check if category is parent category
+        """Check if category is parent category and handle series splitting
+
+        When a budget with a series is updated and significant fields change,
+        stop the old series and create a new one with updated values.
 
         Raises:
             ValidationError: when category is not parent category
         """
+        # Get the old instance before changes
+        old_instance = self.get_object()
+        old_series = old_instance.series
 
         category = serializer.validated_data.get("category")
         if category and category.parent is not None:
             raise ValidationError("Only parent categories can be used for budgets.")
+
+        # Check if significant fields changed for a budget with a series
+        if old_series and old_instance.budget_date:
+            # Fields that trigger series split
+            changed_fields = {}
+
+            # Check amount
+            new_amount = serializer.validated_data.get("amount", old_instance.amount)
+            if new_amount != old_series.amount:
+                changed_fields["amount"] = new_amount
+
+            # Check currency
+            new_currency = serializer.validated_data.get(
+                "currency", old_instance.currency
+            )
+            if new_currency.uuid != old_series.currency.uuid:
+                changed_fields["currency"] = new_currency
+
+            # Check category
+            new_category = serializer.validated_data.get(
+                "category", old_instance.category
+            )
+            if new_category.uuid != old_series.category.uuid:
+                changed_fields["category"] = new_category
+
+            # Check title
+            new_title = serializer.validated_data.get("title", old_instance.title)
+            if new_title != old_series.title:
+                changed_fields["title"] = new_title
+
+            # Check recurrent type (maps to frequency)
+            new_recurrent = serializer.validated_data.get(
+                "recurrent", old_instance.recurrent_type
+            )
+            frequency_map = {
+                BudgetDuplicateType.WEEKLY.value: BudgetSeries.Frequency.WEEKLY,
+                BudgetDuplicateType.MONTHLY.value: BudgetSeries.Frequency.MONTHLY,
+            }
+            new_frequency = frequency_map.get(new_recurrent) if new_recurrent else None
+
+            if new_frequency and new_frequency != old_series.frequency:
+                changed_fields["frequency"] = new_frequency
+
+            # If any significant fields changed, split the series
+            if changed_fields:
+                # Calculate previous occurrence date based on series frequency
+                if old_series.frequency == BudgetSeries.Frequency.WEEKLY:
+                    delta = relativedelta(weeks=old_series.interval)
+                else:  # MONTHLY
+                    delta = relativedelta(months=old_series.interval)
+
+                previous_date = old_instance.budget_date - delta
+
+                # Stop old series at previous occurrence
+                old_series.until = previous_date
+                old_series.save()
+
+                # Create new series with updated values
+                new_series = BudgetSeries.objects.create(
+                    user=old_instance.user,
+                    workspace=old_instance.workspace,
+                    title=changed_fields.get("title", old_series.title),
+                    category=changed_fields.get("category", old_series.category),
+                    currency=changed_fields.get("currency", old_series.currency),
+                    amount=changed_fields.get("amount", old_series.amount),
+                    start_date=old_instance.budget_date,
+                    frequency=changed_fields.get("frequency", old_series.frequency),
+                    interval=old_series.interval,
+                    count=None,
+                    until=None,
+                )
+
+                # Update this budget to point to new series
+                serializer.validated_data["series"] = new_series
+
+                # Find all future budgets in the old series (from current date forward)
+                future_budgets = Budget.objects.filter(
+                    series=old_series, budget_date__gte=old_instance.budget_date
+                ).prefetch_related("transaction_set")
+
+                reassigned_count = 0
+                updated_count = 0
+                for future_budget in future_budgets:
+                    # Reassign to new series
+                    future_budget.series = new_series
+                    reassigned_count += 1
+
+                    # Update values only if budget has no transactions (empty budget)
+                    if not future_budget.transaction_set.exists():
+                        if "amount" in changed_fields:
+                            future_budget.amount = changed_fields["amount"]
+                        if "currency" in changed_fields:
+                            future_budget.currency = changed_fields["currency"]
+                        if "category" in changed_fields:
+                            future_budget.category = changed_fields["category"]
+                        if "title" in changed_fields:
+                            future_budget.title = changed_fields["title"]
+                        updated_count += 1
+
+                    future_budget.save()
+
+                logger.info(
+                    "budget_series.split",
+                    old_series_uuid=old_series.uuid,
+                    new_series_uuid=new_series.uuid,
+                    budget_uuid=old_instance.uuid,
+                    budget_date=old_instance.budget_date,
+                    stopped_old_at=previous_date,
+                    changed_fields=list(changed_fields.keys()),
+                    reassigned_budgets=reassigned_count,
+                    updated_budgets=updated_count,
+                )
+
         instance = serializer.save()
         BudgetService.create_budget_multicurrency_amount(
             [instance.uuid], workspace=instance.workspace

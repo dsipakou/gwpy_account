@@ -105,7 +105,7 @@ class Budget(models.Model):
                 "MONTHLY": BudgetDuplicateType.MONTHLY.value,
             }
             # Access series.frequency (will use cached value if select_related)
-            return frequency_map.get(self.series.frequency, None)
+            return frequency_map.get(self.series.frequency)
 
         # No series = non-recurrent (return None instead of "occasional")
         return None

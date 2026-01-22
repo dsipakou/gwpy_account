@@ -238,6 +238,8 @@ class BudgetService:
         date_to: str,
         user: str | None,
     ):
+        date_to_formatted = utils.get_end_of_current_week_datetime(date_to)
+        cls.materialize_budgets(workspace, date_to_formatted)
         budgets = (
             budgets_qs.filter(budget_date__lte=date_to, budget_date__gte=date_from)
             .select_related("currency", "category", "multicurrency", "user", "series")

@@ -13,7 +13,7 @@ from rest_framework.generics import (
 from rest_framework.response import Response
 
 from budget import serializers
-from budget.models import Budget, BudgetSeriesException
+from budget.models import Budget, BudgetSeriesException, BudgetSeries
 from budget.serializers import DuplicateResponseSerializer
 from budget.services import BudgetService
 from categories.models import Category
@@ -243,3 +243,87 @@ class LastMonthsBudgetUsageList(ListAPIView):
         serializer = self.get_serializer(instance=grouped_transactions, many=True)
 
         return Response(serializer.data)
+
+
+class BudgetSeriesStop(GenericAPIView):
+    """Stop a budget series from materializing future budgets"""
+
+    queryset = BudgetSeries.objects.all()
+    permission_classes = (BaseUserPermission,)
+    lookup_field = "uuid"
+
+    @transaction.atomic
+    def post(self, request, uuid):
+        """Stop the series at a specified date or today
+
+        Request body (optional):
+        {
+            "until": "2024-12-31"  # Stop series at this date (optional, defaults to today)
+        }
+        """
+        try:
+            series = self.get_queryset().get(uuid=uuid)
+        except BudgetSeries.DoesNotExist:
+            return Response(
+                {"error": "Series not found"}, status=status.HTTP_404_NOT_FOUND
+            )
+
+        # Get until date from request or use today
+        until_date_str = request.data.get("until")
+        if until_date_str:
+            try:
+                until_date = datetime.datetime.strptime(
+                    until_date_str, "%Y-%m-%d"
+                ).date()
+            except ValueError:
+                return Response(
+                    {"error": "Invalid date format. Use YYYY-MM-DD"},
+                    status=status.HTTP_400_BAD_REQUEST,
+                )
+        else:
+            # Default to today
+            until_date = datetime.date.today()
+
+        # Validate: until date should not be before start_date
+        if until_date < series.start_date:
+            return Response(
+                {
+                    "error": f"until date cannot be before series start_date ({series.start_date})"
+                },
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+
+        # Delete empty budgets (without transactions) after the until_date
+        future_budgets = Budget.objects.filter(
+            series=series, budget_date__gt=until_date
+        ).prefetch_related("transaction_set")
+
+        deleted_count = 0
+        for budget in future_budgets:
+            # Only delete if budget has no transactions
+            if not budget.transaction_set.exists():
+                budget.delete()
+                deleted_count += 1
+
+        # Update series
+        series.until = until_date
+        series.save()
+
+        logger.info(
+            "budget_series.stopped",
+            series_uuid=series.uuid,
+            series_title=series.title,
+            until=until_date,
+            stopped_by=request.user.uuid,
+            deleted_empty_budgets=deleted_count,
+        )
+
+        return Response(
+            {
+                "uuid": series.uuid,
+                "title": series.title,
+                "until": until_date,
+                "deleted_empty_budgets": deleted_count,
+                "message": f"Series will stop materializing budgets after {until_date}",
+            }
+        )

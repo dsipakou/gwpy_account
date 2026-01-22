@@ -45,7 +45,7 @@ class BudgetSerializer(serializers.ModelSerializer):
         series = None
         recurrent = validated_data.get("recurrent")
 
-        # Only create series for weekly/monthly (not occasional or empty)
+        # Only create series for weekly/monthly
         if recurrent in (
             constants.BudgetDuplicateType.WEEKLY.value,
             constants.BudgetDuplicateType.MONTHLY.value,

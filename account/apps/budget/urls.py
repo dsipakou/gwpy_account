@@ -19,4 +19,9 @@ urlpatterns = [
         name="last_months_sum",
     ),
     path("upcomming/", views.UpcomingBudgetList.as_view(), name="upcoming_budget"),
+    path(
+        "series/<uuid:uuid>/stop/",
+        views.BudgetSeriesStop.as_view(),
+        name="budget_series_stop",
+    ),
 ]

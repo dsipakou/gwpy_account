@@ -1,6 +1,7 @@
 import datetime
 
 import structlog
+from django.db import transaction
 from rest_framework import status
 from rest_framework.exceptions import ValidationError
 from rest_framework.generics import (
@@ -12,7 +13,7 @@ from rest_framework.generics import (
 from rest_framework.response import Response
 
 from budget import serializers
-from budget.models import Budget
+from budget.models import Budget, BudgetSeriesException
 from budget.serializers import DuplicateResponseSerializer
 from budget.services import BudgetService
 from categories.models import Category
@@ -26,10 +27,11 @@ logger = structlog.get_logger()
 
 
 class BudgetList(ListCreateAPIView):
-    queryset = Budget.objects.select_related("category").all()
+    queryset = Budget.objects.select_related("category", "series").all()
     filter_backends = (FilterByUser, FilterByWorkspace)
     serializer_class = serializers.BudgetSerializer
 
+    @transaction.atomic
     def create(self, request, *args, **kwargs):
         """Check if category is parent category
 
@@ -54,17 +56,20 @@ class BudgetList(ListCreateAPIView):
 
 
 class BudgetPendingList(ListAPIView):
-    queryset = Budget.objects.filter(budget_date__isnull=True)
+    queryset = Budget.objects.filter(budget_date__isnull=True).select_related("series")
     filter_backends = (FilterByUser, FilterByWorkspace)
     serializer_class = serializers.BudgetSerializer
 
 
 class BudgetDetails(RetrieveUpdateDestroyAPIView):
-    queryset = Budget.objects.prefetch_related("transaction_set")
+    queryset = Budget.objects.select_related("series").prefetch_related(
+        "transaction_set"
+    )
     serializer_class = serializers.BudgetSerializer
     permission_classes = (BaseUserPermission,)
     lookup_field = "uuid"
 
+    @transaction.atomic
     def perform_update(self, serializer):
         """Check if category is parent category
 
@@ -80,6 +85,30 @@ class BudgetDetails(RetrieveUpdateDestroyAPIView):
             [instance.uuid], workspace=instance.workspace
         )
 
+    @transaction.atomic
+    def perform_destroy(self, instance):
+        """Track deletion in BudgetSeriesException if budget belongs to a series
+
+        When a budget that's part of a series is deleted, create an exception
+        record so the materialization service won't recreate it. All budgets
+        are treated equally - no special handling for parent/original budgets.
+        """
+        # Only track if budget has both series and date
+        if instance.series and instance.budget_date:
+            BudgetSeriesException.objects.get_or_create(
+                series=instance.series,
+                date=instance.budget_date,
+                defaults={"is_skipped": True},
+            )
+            logger.info(
+                "budget_deleted.exception_created",
+                budget_uuid=instance.uuid,
+                series_uuid=instance.series.uuid,
+                date=instance.budget_date,
+            )
+
+        instance.delete()
+
 
 class MonthlyUsageBudgetList(ListAPIView):
     queryset = Budget.objects.all()
@@ -91,8 +120,10 @@ class MonthlyUsageBudgetList(ListAPIView):
         date_to = request.GET.get("dateTo", datetime.date.today())
         user = request.GET.get("user")
         queryset = self.filter_queryset(self.get_queryset())
+        workspace = request.user.active_workspace
 
         categories = BudgetService.load_budget_v2(
+            workspace=workspace,
             budgets_qs=queryset,
             categories_qs=Category.objects.filter(
                 workspace=request.user.active_workspace
@@ -139,7 +170,7 @@ class WeeklyUsageList(ListAPIView):
 
 
 class UpcomingBudgetList(ListAPIView):
-    queryset = Budget.objects.all()
+    queryset = Budget.objects.select_related("series").all()
     filter_backends = (FilterByUser, FilterByWorkspace)
     serializer_class = serializers.BudgetSerializer
 

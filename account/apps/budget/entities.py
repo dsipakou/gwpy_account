@@ -100,7 +100,7 @@ class BudgetModel(pydantic.BaseModel):
             category_name=budget.category.name,
             description=budget.description,
             is_completed=budget.is_completed,
-            recurrent=budget.recurrent,
+            recurrent=budget.recurrent_type,
             planned=budget.amount,
             planned_in_currencies={
                 currency["code"]: budget.multicurrency_map.get(currency["code"], 0)
@@ -127,7 +127,7 @@ class BudgetModel(pydantic.BaseModel):
             category_name=budget.category.name,
             description=budget.description,
             is_completed=budget.is_completed,
-            recurrent=budget.recurrent,
+            recurrent=budget.recurrent_type,
             created_at=budget.created_at,
             modified_at=budget.modified_at,
             planned=0,

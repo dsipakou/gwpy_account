@@ -3,7 +3,7 @@ from uuid import UUID
 
 import structlog
 from dateutil.relativedelta import relativedelta
-from dateutil.rrule import MONTHLY, rrule
+from dateutil.rrule import MONTHLY, WEEKLY, rrule
 from django.db.models import Count, FloatField, Prefetch, Q, QuerySet, Sum, Value
 from django.db.models.fields.json import KeyTextTransform
 from django.db.models.functions import Cast, Coalesce, Round, TruncMonth
@@ -22,7 +22,7 @@ from budget.entities import (
     MonthUsageSum,
 )
 from budget.exceptions import UnsupportedDuplicateTypeError
-from budget.models import Budget, BudgetMulticurrency
+from budget.models import Budget, BudgetMulticurrency, BudgetSeries
 from categories import constants
 from currencies.models import Currency
 from rates.models import Rate
@@ -71,6 +71,151 @@ class BudgetService:
                 budget=budget, defaults={"amount_map": amount_map}
             )
 
+    @classmethod
+    def _calculate_occurrences(
+        cls, series: BudgetSeries, to_date: datetime.date
+    ) -> list[datetime.date]:
+        freq_map = {
+            "WEEKLY": WEEKLY,
+            "MONTHLY": MONTHLY,
+        }
+
+        count = series.count
+        if count:
+            skipped_count = series.exceptions.filter(is_skipped=True).count()
+            count = count + skipped_count
+
+        occurrences = rrule(
+            freq=freq_map[str(series.frequency)],
+            interval=series.interval,  # type: ignore[arg-type]
+            dtstart=series.start_date,
+            until=series.until or to_date,
+            count=count,
+        )
+        return [dt.date() for dt in occurrences]
+
+    @classmethod
+    def _calculate_smart_amount(cls, series: BudgetSeries) -> float:
+        """Calculate smart budget amount based on historical spending.
+
+        If this is the 7th+ occurrence (6+ previous budgets exist), calculate
+        the average spending from the last 6 budgets in the series currency.
+        Otherwise, use the series amount.
+
+        Args:
+            series: The BudgetSeries to calculate amount for
+
+        Returns:
+            Smart amount based on historical data or series default
+        """
+        # Get existing budgets for this series, ordered by date
+        existing_budgets = (
+            Budget.objects.filter(series=series)
+            .select_related("currency")
+            .prefetch_related("transaction_set__multicurrency")
+            .order_by("-budget_date")[:6]
+        )
+
+        if existing_budgets.count() < 6:
+            return float(series.amount)
+
+        currency_code = series.currency.code
+        total_spending = 0.0
+        budgets_with_spending = 0
+
+        for budget in existing_budgets:
+            # Sum all transaction amounts in the budget's currency
+            budget_spending = 0.0
+            transactions = Transaction.objects.filter(budget=budget).select_related(
+                "multicurrency"
+            )
+
+            for transaction in transactions:
+                # Get amount from multicurrency conversion
+                if hasattr(transaction, "multicurrency") and transaction.multicurrency:
+                    amount_map = transaction.multicurrency.amount_map
+                    budget_spending += amount_map.get(currency_code, 0.0)
+                else:
+                    # Fallback: if no multicurrency, check if same currency
+                    if transaction.currency.code == currency_code:
+                        budget_spending += transaction.amount
+
+            # Only include budgets with actual spending
+            if budget_spending > 0:
+                total_spending += budget_spending
+                budgets_with_spending += 1
+
+        if budgets_with_spending > 0:
+            average_spending = total_spending / budgets_with_spending
+            logger.debug(
+                "smart_amount.calculated",
+                series=series.title,
+                average=average_spending,
+                budgets_with_spending=budgets_with_spending,
+                currency=currency_code,
+            )
+            return average_spending
+
+        # In case if all budgets are with zero spending, return series amount
+        return float(series.amount)
+
+    @classmethod
+    # TODO: Need to consider 'workspace' parameter usage
+    # maybe it make sense to allow materialization per workspace permission
+    # like admin can materialize for all workspace budgets
+    # member only for his own budgets
+    def materialize_budgets(
+        cls,
+        workspace: Workspace,
+        date_to: datetime.datetime,
+    ) -> None:
+        series_list = BudgetSeries.objects.filter(workspace=workspace)
+
+        for series in series_list:
+            dates = cls._calculate_occurrences(series, date_to)
+
+            # Get skipped dates for this series
+            skipped_dates = set(
+                series.exceptions.filter(is_skipped=True).values_list("date", flat=True)
+            )
+
+            for date in dates:
+                # Skip dates that have been marked as deleted/skipped
+                if date in skipped_dates:
+                    logger.debug(
+                        "materialize_budgets.skipped",
+                        budget=series.title,
+                        date=date,
+                        reason="marked_as_skipped",
+                    )
+                    continue
+
+                # Calculate smart amount based on historical spending
+                smart_amount = cls._calculate_smart_amount(series)
+
+                budget, created = Budget.objects.get_or_create(
+                    series=series,
+                    budget_date=date,
+                    defaults={
+                        "user": series.user,
+                        "workspace": series.workspace,
+                        "title": series.title,
+                        "amount": smart_amount,
+                        "category": series.category,
+                        "currency": series.currency,
+                    },
+                )
+                if created:
+                    cls.create_budget_multicurrency_amount(
+                        [budget.uuid], workspace=workspace
+                    )
+                    logger.debug(
+                        "materialize_budgets.created",
+                        budget=series.title,
+                        date=date,
+                        amount=smart_amount,
+                    )
+
     @staticmethod
     def _get_latest_rates():
         latest_rates = {}
@@ -84,6 +229,7 @@ class BudgetService:
     def load_budget_v2(
         cls,
         *,
+        workspace: Workspace,
         budgets_qs: QuerySet,
         categories_qs: QuerySet,
         currencies_qs: QuerySet,
@@ -94,7 +240,7 @@ class BudgetService:
     ):
         budgets = (
             budgets_qs.filter(budget_date__lte=date_to, budget_date__gte=date_from)
-            .select_related("currency", "category", "multicurrency", "user")
+            .select_related("currency", "category", "multicurrency", "user", "series")
             .order_by("budget_date")
         )
         parent_categories = categories_qs.filter(
@@ -314,7 +460,7 @@ class BudgetService:
         budgets = (
             queryset.filter(budget_date__lte=date_to, budget_date__gte=date_from)
             .prefetch_related(budget_transactions_prefetch)
-            .select_related("currency", "category", "multicurrency", "user")
+            .select_related("currency", "category", "multicurrency", "user", "series")
             .order_by("budget_date")
         )
 
@@ -354,8 +500,11 @@ class BudgetService:
         workspace: Workspace,
         user: str | None,
     ) -> list[BudgetItem]:
+        date_to_formatted = utils.get_end_of_current_week_datetime(date_to)
+        cls.materialize_budgets(workspace, date_to_formatted)
         budgets = (
             qs.filter(budget_date__lte=date_to, budget_date__gte=date_from)
+            .select_related("series")
             .prefetch_related(
                 Prefetch(
                     "transaction_set",
@@ -549,7 +698,7 @@ class BudgetService:
                 budget_date=budget.budget_date,
                 transactions=transactions,
                 description=budget.description,
-                recurrent=budget.recurrent,
+                recurrent=budget.recurrent_type,
                 is_completed=budget.is_completed,
                 planned=budget.amount,
                 planned_in_currencies=planned_in_currencies,

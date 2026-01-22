@@ -2,7 +2,7 @@ from rest_framework import serializers
 from rest_framework.exceptions import ValidationError
 
 from budget import constants
-from budget.models import Budget
+from budget.models import Budget, BudgetSeries, BudgetSeriesException
 
 
 class BudgetSerializer(serializers.ModelSerializer):
@@ -23,15 +23,78 @@ class BudgetSerializer(serializers.ModelSerializer):
             "modified_at",
         )
 
+    def to_representation(self, instance):
+        """Use model's recurrent_type property for output
+
+        Returns:
+        - "weekly" or "monthly" for budgets with series
+        - None for non-recurrent budgets (no series)
+        """
+        data = super().to_representation(instance)
+        # Replace database recurrent field with calculated property
+        # (can be "weekly", "monthly", or None)
+        data["recurrent"] = instance.recurrent_type
+        return data
+
     def create(self, validated_data):
         workspace = validated_data["user"].active_workspace
         if not workspace:
             raise ValidationError("User has no active workspace")
+
+        # Handle BudgetSeries creation/linking for WEEKLY and MONTHLY budgets
+        series = None
+        recurrent = validated_data.get("recurrent")
+
+        # Only create series for weekly/monthly (not occasional or empty)
+        if recurrent in (
+            constants.BudgetDuplicateType.WEEKLY.value,
+            constants.BudgetDuplicateType.MONTHLY.value,
+        ):
+            # Map recurrent value to BudgetSeries frequency
+            frequency_map = {
+                constants.BudgetDuplicateType.WEEKLY.value: BudgetSeries.Frequency.WEEKLY,
+                constants.BudgetDuplicateType.MONTHLY.value: BudgetSeries.Frequency.MONTHLY,
+            }
+            frequency = frequency_map[recurrent]
+
+            # Look for existing BudgetSeries with same user, title, and frequency
+            series = BudgetSeries.objects.filter(
+                user=validated_data["user"],
+                title=validated_data["title"],
+                frequency=frequency,
+            ).first()
+
+            # Create new BudgetSeries if one doesn't exist
+            if not series:
+                series = BudgetSeries.objects.create(
+                    user=validated_data["user"],
+                    workspace=workspace,
+                    title=validated_data["title"],
+                    category=validated_data["category"],
+                    currency=validated_data["currency"],
+                    amount=validated_data["amount"],
+                    start_date=validated_data["budget_date"],
+                    frequency=frequency,
+                    interval=1,
+                    count=None,
+                    until=None,
+                )
+
         data = {
             **validated_data,
             "workspace": workspace,
+            "series": series,
         }
-        return super().create(data)
+        budget = super().create(data)
+
+        # If this budget has a series and date, remove any skip exception
+        # (user is "un-skipping" this date by manually creating a budget)
+        if budget.series and budget.budget_date:
+            BudgetSeriesException.objects.filter(
+                series=budget.series, date=budget.budget_date, is_skipped=True
+            ).delete()
+
+        return budget
 
 
 class TransactionSerializer(serializers.Serializer):

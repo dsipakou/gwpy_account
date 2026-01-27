@@ -193,16 +193,19 @@ class BudgetService:
                 # Calculate smart amount based on historical spending
                 smart_amount = cls._calculate_smart_amount(series)
 
+                # Use title, budget_date, user as lookup to respect unique_together constraint
+                # If a budget with this combination exists (even with different series),
+                # we don't create a duplicate
                 budget, created = Budget.objects.get_or_create(
-                    series=series,
+                    title=series.title,
                     budget_date=date,
+                    user=series.user,
                     defaults={
-                        "user": series.user,
                         "workspace": series.workspace,
-                        "title": series.title,
                         "amount": smart_amount,
                         "category": series.category,
                         "currency": series.currency,
+                        "series": series,
                     },
                 )
                 if created:
@@ -214,6 +217,17 @@ class BudgetService:
                         budget=series.title,
                         date=date,
                         amount=smart_amount,
+                    )
+                elif not budget.series:
+                    # Budget exists but has no series - link it to this series
+                    budget.series = series
+                    budget.save()
+                    logger.debug(
+                        "materialize_budgets.series_linked",
+                        budget=series.title,
+                        date=date,
+                        budget_uuid=budget.uuid,
+                        series_uuid=series.uuid,
                     )
 
     @staticmethod
@@ -829,7 +843,7 @@ class BudgetService:
                         "title": item.title,
                         "amount": avg_sum,
                         "currency": item.currency.sign,
-                        "recurrent": item.recurrent,
+                        "recurrent": item.recurrent_type,  # Use property instead of database field
                     }
                 )
 

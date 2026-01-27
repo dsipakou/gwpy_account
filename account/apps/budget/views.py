@@ -15,7 +15,7 @@ from rest_framework.response import Response
 
 from budget import serializers
 from budget.constants import BudgetDuplicateType
-from budget.models import Budget, BudgetSeriesException, BudgetSeries
+from budget.models import Budget, BudgetSeries, BudgetSeriesException
 from budget.serializers import DuplicateResponseSerializer
 from budget.services import BudgetService
 from categories.models import Category
@@ -199,6 +199,51 @@ class BudgetDetails(RetrieveUpdateDestroyAPIView):
                     changed_fields=list(changed_fields.keys()),
                     reassigned_budgets=reassigned_count,
                     updated_budgets=updated_count,
+                )
+
+        # Create series if budget doesn't have one but recurrent type is set
+        elif not old_series and old_instance.budget_date:
+            new_recurrent = serializer.validated_data.get("recurrent")
+
+            # Only create series for weekly/monthly recurrent types
+            if new_recurrent in (
+                BudgetDuplicateType.WEEKLY.value,
+                BudgetDuplicateType.MONTHLY.value,
+            ):
+                frequency_map = {
+                    BudgetDuplicateType.WEEKLY.value: BudgetSeries.Frequency.WEEKLY,
+                    BudgetDuplicateType.MONTHLY.value: BudgetSeries.Frequency.MONTHLY,
+                }
+                frequency = frequency_map[new_recurrent]
+
+                # Get values from validated_data or fall back to old_instance
+                new_series = BudgetSeries.objects.create(
+                    user=old_instance.user,
+                    workspace=old_instance.workspace,
+                    title=serializer.validated_data.get("title", old_instance.title),
+                    category=serializer.validated_data.get(
+                        "category", old_instance.category
+                    ),
+                    currency=serializer.validated_data.get(
+                        "currency", old_instance.currency
+                    ),
+                    amount=serializer.validated_data.get("amount", old_instance.amount),
+                    start_date=old_instance.budget_date,
+                    frequency=frequency,
+                    interval=1,
+                    count=None,
+                    until=None,
+                )
+
+                # Update this budget to point to new series
+                serializer.validated_data["series"] = new_series
+
+                logger.info(
+                    "budget_series.created",
+                    series_uuid=new_series.uuid,
+                    budget_uuid=old_instance.uuid,
+                    budget_date=old_instance.budget_date,
+                    frequency=frequency,
                 )
 
         instance = serializer.save()

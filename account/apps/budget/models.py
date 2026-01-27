@@ -73,6 +73,10 @@ class Budget(models.Model):
     budget_date = models.DateField(blank=True, null=True)
     description = models.TextField(null=True, blank=True)
     is_completed = models.BooleanField(default=False)
+    # NOTE: This field is stored for backward compatibility and manual duplication.
+    # For OUTPUT, use the `recurrent_type` property which calculates value from `series` relationship.
+    # Input: Field accepts values and is stored to support manual budget duplication
+    # Output: Serializers override this field with `recurrent_type` property value
     recurrent = models.CharField(
         null=True, blank=True, max_length=20, choices=RECURRENT_CHOICES
     )

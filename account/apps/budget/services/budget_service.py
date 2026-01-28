@@ -2,22 +2,12 @@ import datetime
 import warnings
 from uuid import UUID
 
-import structlog
-from dateutil.relativedelta import relativedelta
-from dateutil.rrule import MONTHLY, rrule
-from django.db.models import FloatField, Prefetch, QuerySet, Sum, Value
-from django.db.models.fields.json import KeyTextTransform
-from django.db.models.functions import Cast, Coalesce, TruncMonth
+from django.db.models import QuerySet
 
-from budget import utils
 from budget.constants import BudgetDuplicateType
 from budget.entities import (
     BudgetGroupedItem,
     BudgetItem,
-    BudgetModel,
-    BudgetTransactionModel,
-    CategoryModel,
-    GroupedBudgetModel,
     MonthUsageSum,
 )
 from budget.models import BudgetSeries
@@ -26,13 +16,10 @@ from budget.services.duplication_service import (
 )
 from budget.services.entity_transformer import BudgetEntityTransformer
 from budget.services.multicurrency_service import BudgetMulticurrencyService
+from budget.services.reporting_service import BudgetReportingService
 from budget.services.series_service import BudgetSeriesService
-from categories import constants
-from transactions.models import Transaction
 from users.models import User
 from workspaces.models import Workspace
-
-logger = structlog.get_logger()
 
 
 class BudgetService:
@@ -127,68 +114,35 @@ class BudgetService:
     def _initialize_category_map(cls, parent_categories, available_currencies) -> dict:
         """Create map of all categories from workspace with minimum data.
 
-        Args:
-            parent_categories: QuerySet of parent Category models
-            available_currencies: List of currency dicts with code and is_base
-
-        Returns:
-            Dict mapping category UUID to CategoryModel instances
+        DEPRECATED: Use BudgetReportingService._initialize_category_map instead.
+        This wrapper will be removed in a future release.
         """
-        categories_map = {}
-        for category in parent_categories:
-            categories_map[category.uuid] = CategoryModel.init(
-                category, available_currencies
-            )
-        return categories_map
+        warnings.warn(
+            "BudgetService._initialize_category_map is deprecated. "
+            "Use BudgetReportingService._initialize_category_map instead.",
+            DeprecationWarning,
+            stacklevel=2,
+        )
+        return BudgetReportingService._initialize_category_map(
+            parent_categories, available_currencies
+        )
 
     @classmethod
     def _populate_budget_groups(cls, budgets, categories_map, available_currencies):
         """Create grouped budgets with planned values.
 
-        Args:
-            budgets: QuerySet of Budget models
-            categories_map: Dict mapping category UUID to CategoryModel
-            available_currencies: List of currency dicts with code and is_base
-
-        Mutates categories_map by adding budget groups and planned values.
+        DEPRECATED: Use BudgetReportingService._populate_budget_groups instead.
+        This wrapper will be removed in a future release.
         """
-        for budget in budgets:
-            category_for_budget = categories_map[budget.category.uuid]
-
-            transaction_budget_group_key = GroupedBudgetModel.get_grouped_budget_key(
-                budget
-            )
-
-            # If this budget group isn't exists yet in this category - create it
-            if transaction_budget_group_key not in category_for_budget.budgets_map:
-                category_for_budget.budgets_map[transaction_budget_group_key] = (
-                    GroupedBudgetModel.init(
-                        budget,
-                        available_currencies,
-                    )
-                )
-
-            budget_group_item = category_for_budget.budgets_map[
-                transaction_budget_group_key
-            ]
-
-            # Add budget to budget group
-            budget_group_item.items_map[budget.uuid] = BudgetModel.init(
-                budget,
-                available_currencies,
-            )
-
-            # Increase planned values with real budget value
-            # TODO: remove this since this value are obsolete
-            budget_group_item.planned += budget.amount
-            category_for_budget.planned += budget.amount
-
-            budget_group_item.update_planned_values(
-                available_currencies, budget.multicurrency_map
-            )
-            category_for_budget.update_planned_values(
-                available_currencies, budget.multicurrency_map
-            )
+        warnings.warn(
+            "BudgetService._populate_budget_groups is deprecated. "
+            "Use BudgetReportingService._populate_budget_groups instead.",
+            DeprecationWarning,
+            stacklevel=2,
+        )
+        return BudgetReportingService._populate_budget_groups(
+            budgets, categories_map, available_currencies
+        )
 
     @classmethod
     def _populate_budget_spending(
@@ -201,143 +155,37 @@ class BudgetService:
     ):
         """Fill in budget spending from transactions.
 
-        Args:
-            transactions: QuerySet of Transaction models
-            categories_map: Dict mapping category UUID to CategoryModel
-            available_currencies: List of currency dicts with code and is_base
-            date_from_parsed: Start date as datetime.date
-            date_to_parsed: End date as datetime.date
-
-        Mutates categories_map by adding transaction spending to budgets.
+        DEPRECATED: Use BudgetReportingService._populate_budget_spending instead.
+        This wrapper will be removed in a future release.
         """
-        for transaction in transactions:
-            # Prepare transaction model
-            transaction_model = BudgetTransactionModel.init(transaction)
-
-            transaction_budget = transaction.budget
-            transaction_budget_group_key = GroupedBudgetModel.get_grouped_budget_key(
-                transaction_budget
-            )
-
-            # Actual transaction category might differ from budget category
-            transaction_category = transaction.category.parent
-
-            # TODO: make a migration to rid off nullable budgets
-            # Legacy support when transaction can be without a budget
-            if not transaction_budget:
-                continue
-
-            transaction_category_object = categories_map[transaction_category.uuid]
-
-            # TODO: Remove this
-            transaction_category_object.spent += transaction.amount
-            transaction_category_object.update_spent_values(
-                available_currencies, transaction.multicurrency_map
-            )
-
-            # Find or append budget group to category
-            # title + uuid + year-month uniqueness
-            if (
-                transaction_budget_group_key
-                not in transaction_category_object.budgets_map
-            ):
-                transaction_category_object.budgets_map[
-                    transaction_budget_group_key
-                ] = GroupedBudgetModel.build_for_transaction(
-                    transaction_budget,
-                    transaction_category_object,
-                    date_from_parsed,
-                    date_to_parsed,
-                    available_currencies,
-                )
-
-            budget_group_item = transaction_category_object.budgets_map[
-                transaction_budget_group_key
-            ]
-
-            budget_group_item.spent += transaction.amount
-            budget_group_item.update_spent_values(
-                available_currencies, transaction.multicurrency_map
-            )
-            budget_group_item.update_spent_overall_values(
-                available_currencies, transaction.multicurrency_map
-            )
-
-            # Find or append budget to budget group
-            if transaction_budget.uuid not in budget_group_item.items_map:
-                budget_group_item.items_map[transaction_budget.uuid] = (
-                    BudgetModel.init_for_transaction(
-                        transaction_budget, available_currencies
-                    )
-                )
-
-            simple_budget_item = budget_group_item.items_map[transaction_budget.uuid]
-
-            simple_budget_item.spent += transaction.amount
-            simple_budget_item.update_spent_values(
-                available_currencies, transaction.multicurrency_map
-            )
-            simple_budget_item.transactions.append(transaction_model)
-
-            # Logic when transaction and budget categories are no the same
-            transaction_budget_category = transaction_budget.category
-            if transaction_category != transaction_budget_category:
-                transaction_budget_category_object = categories_map[
-                    transaction_budget_category.uuid
-                ]
-                if (
-                    transaction_budget_group_key
-                    not in transaction_budget_category_object.budgets_map
-                ):
-                    transaction_budget_category_object.budgets_map[
-                        transaction_budget_group_key
-                    ] = GroupedBudgetModel.build_for_transaction(
-                        transaction_budget,
-                        transaction_category_object,
-                        date_from_parsed,
-                        date_to_parsed,
-                        available_currencies,
-                    )
-                simple_budget_grouped_budget_item = (
-                    transaction_budget_category_object.budgets_map[
-                        transaction_budget_group_key
-                    ]
-                )
-                simple_budget_grouped_budget_item.update_spent_overall_values(
-                    available_currencies, transaction.multicurrency_map
-                )
-                if (
-                    transaction_budget.uuid
-                    not in simple_budget_grouped_budget_item.items_map
-                ):
-                    simple_budget_grouped_budget_item.items_map[
-                        transaction_budget.uuid
-                    ] = BudgetModel.init_for_transaction(
-                        transaction_budget, available_currencies
-                    )
-                simple_budget_budget_item = simple_budget_grouped_budget_item.items_map[
-                    transaction_budget.uuid
-                ]
-                if transaction_category != transaction_budget_category:
-                    simple_budget_budget_item.transactions.append(transaction_model)
+        warnings.warn(
+            "BudgetService._populate_budget_spending is deprecated. "
+            "Use BudgetReportingService._populate_budget_spending instead.",
+            DeprecationWarning,
+            stacklevel=2,
+        )
+        return BudgetReportingService._populate_budget_spending(
+            transactions,
+            categories_map,
+            available_currencies,
+            date_from_parsed,
+            date_to_parsed,
+        )
 
     @classmethod
     def _finalize_output(cls, categories_map) -> list[dict]:
         """Convert category map to output list format.
 
-        Args:
-            categories_map: Dict mapping category UUID to CategoryModel
-
-        Returns:
-            List of category dicts with nested budgets and items
+        DEPRECATED: Use BudgetReportingService._finalize_output instead.
+        This wrapper will be removed in a future release.
         """
-        output = list(categories_map.values())
-        for cat in output:
-            cat.budgets = list(cat.budgets_map.values())
-            for bud in cat.budgets:
-                bud.items = list(bud.items_map.values())
-
-        return [item.dict() for item in output]
+        warnings.warn(
+            "BudgetService._finalize_output is deprecated. "
+            "Use BudgetReportingService._finalize_output instead.",
+            DeprecationWarning,
+            stacklevel=2,
+        )
+        return BudgetReportingService._finalize_output(categories_map)
 
     @classmethod
     def load_budget_v2(
@@ -354,80 +202,25 @@ class BudgetService:
     ):
         """Generate monthly budget report with spending analysis.
 
-        This method orchestrates the budget reporting workflow:
-        1. Materialize budget series for the period
-        2. Initialize category structure
-        3. Populate planned budget values
-        4. Add transaction spending data
-        5. Format output for API response
-
-        Args:
-            workspace: Workspace to filter data
-            budgets_qs: QuerySet of Budget models
-            categories_qs: QuerySet of Category models
-            currencies_qs: QuerySet of Currency models
-            transactions_qs: QuerySet of Transaction models
-            date_from: Start date string (YYYY-MM-DD)
-            date_to: End date string (YYYY-MM-DD)
-            user: Optional user UUID to filter budgets/transactions
-
-        Returns:
-            List of category dicts with nested budget groups and items
+        DEPRECATED: Use BudgetReportingService.generate_monthly_report instead.
+        This wrapper will be removed in a future release.
         """
-        # Materialize recurring budgets for the period
-        date_to_formatted = utils.get_end_of_current_week_datetime(date_to)
-        cls.materialize_budgets(workspace, date_to_formatted)
-
-        # Query budgets and categories for the period
-        budgets = (
-            budgets_qs.filter(budget_date__lte=date_to, budget_date__gte=date_from)
-            .select_related("currency", "category", "multicurrency", "user", "series")
-            .order_by("budget_date")
+        warnings.warn(
+            "BudgetService.load_budget_v2 is deprecated. "
+            "Use BudgetReportingService.generate_monthly_report instead.",
+            DeprecationWarning,
+            stacklevel=2,
         )
-        parent_categories = categories_qs.filter(
-            parent__isnull=True, type=constants.EXPENSE
-        ).order_by("name")
-
-        # Query transactions with related data
-        available_currencies = list(currencies_qs.values("code", "is_base"))
-        transactions = transactions_qs.filter(
-            transaction_date__lte=date_to,
-            transaction_date__gte=date_from,
-            category__type=constants.EXPENSE,
+        return BudgetReportingService.generate_monthly_report(
+            workspace=workspace,
+            budgets_qs=budgets_qs,
+            categories_qs=categories_qs,
+            currencies_qs=currencies_qs,
+            transactions_qs=transactions_qs,
+            date_from=date_from,
+            date_to=date_to,
+            user=user,
         )
-        if user:
-            transactions = transactions.filter(budget__user__uuid=user)
-            budgets = budgets.filter(user__uuid=user)
-
-        transactions = transactions.select_related(
-            "multicurrency",
-            "budget",
-            "budget__category",
-            "currency",
-            "category",
-            "category__parent",
-            "user",
-        )
-
-        # Parse date strings once
-        date_from_parsed = datetime.datetime.strptime(date_from, "%Y-%m-%d").date()
-        date_to_parsed = datetime.datetime.strptime(date_to, "%Y-%m-%d").date()
-
-        # Build category map with budget groups and spending
-        categories_map = cls._initialize_category_map(
-            parent_categories, available_currencies
-        )
-        cls._populate_budget_groups(budgets, categories_map, available_currencies)
-        cls._populate_budget_spending(
-            transactions,
-            categories_map,
-            available_currencies,
-            date_from_parsed,
-            date_to_parsed,
-        )
-
-        # Format output for API
-        return cls._finalize_output(categories_map)
 
     @classmethod
     def load_weekly_budget(
@@ -439,36 +232,24 @@ class BudgetService:
         workspace: Workspace,
         user: str | None,
     ) -> list[BudgetItem]:
-        date_to_formatted = utils.get_end_of_current_week_datetime(date_to)
-        cls.materialize_budgets(workspace, date_to_formatted)
-        budgets = (
-            qs.filter(budget_date__lte=date_to, budget_date__gte=date_from)
-            .select_related("series")
-            .prefetch_related(
-                Prefetch(
-                    "transaction_set",
-                    queryset=Transaction.objects.select_related("multicurrency").filter(
-                        budget__in=qs
-                    ),
-                    to_attr="transactions",
-                ),
-            )
-            .all()
-            .order_by("created_at")
+        """Generate weekly budget report.
+
+        DEPRECATED: Use BudgetReportingService.generate_weekly_report instead.
+        This wrapper will be removed in a future release.
+        """
+        warnings.warn(
+            "BudgetService.load_weekly_budget is deprecated. "
+            "Use BudgetReportingService.generate_weekly_report instead.",
+            DeprecationWarning,
+            stacklevel=2,
         )
-        if user:
-            budgets = budgets.filter(user__uuid=user)
-
-        available_currencies = currency_qs.values("code", "is_base")
-        base_currency = available_currencies.filter(is_base=True).first()
-        if not base_currency:
-            return []
-
-        return cls.make_budgets(
-            budgets,
-            cls._get_latest_rates(),
-            available_currencies,
-            base_currency["code"],
+        return BudgetReportingService.generate_weekly_report(
+            qs=qs,
+            currency_qs=currency_qs,
+            date_from=date_from,
+            date_to=date_to,
+            workspace=workspace,
+            user=user,
         )
 
     @classmethod
@@ -578,57 +359,21 @@ class BudgetService:
         user: User,
         filter_by_user: str | None = None,
     ) -> list[MonthUsageSum]:
-        currency_code = user.currency_code()
-        if not currency_code:
-            return
+        """Get historical spending for a category over the last 6 months.
 
-        selected_month_first_day = month.replace(day=1)
-        six_month_earlier = month - relativedelta(months=6)
-
-        transactions = transactions.filter(
-            category__parent=category_uuid,
-            transaction_date__lt=selected_month_first_day,
-            transaction_date__gte=six_month_earlier,
-        ).prefetch_related("multicurrency")
-
-        if filter_by_user:
-            transactions = transactions.filter(user=filter_by_user)
-
-        # get values for current default currency only
-        grouped_transactions = transactions.annotate(
-            current_currency_amount=Coalesce(
-                Cast(
-                    KeyTextTransform(currency_code, "multicurrency__amount_map"),
-                    FloatField(),
-                ),
-                Value(0, output_field=FloatField()),
-            )
+        DEPRECATED: Use BudgetReportingService.get_historical_usage instead.
+        This wrapper will be removed in a future release.
+        """
+        warnings.warn(
+            "BudgetService.get_last_months_usage is deprecated. "
+            "Use BudgetReportingService.get_historical_usage instead.",
+            DeprecationWarning,
+            stacklevel=2,
         )
-        # trunc dates to months
-        grouped_transactions = grouped_transactions.annotate(
-            month=TruncMonth("transaction_date")
-        ).values("month")
-        # group spent amount by months
-        grouped_transactions = grouped_transactions.annotate(
-            amount=Sum("current_currency_amount")
-        ).order_by("month")
-        all_months = rrule(
-            MONTHLY,
-            dtstart=six_month_earlier,
-            until=selected_month_first_day - relativedelta(months=1),
+        return BudgetReportingService.get_historical_usage(
+            transactions=transactions,
+            month=month,
+            category_uuid=category_uuid,
+            user=user,
+            filter_by_user=filter_by_user,
         )
-
-        # add empty months with 0 amount
-        clean_transactions: list[MonthUsageSum] = []
-        for current_month in all_months:
-            if transaction := grouped_transactions.filter(month=current_month).first():
-                amount = transaction.get("amount", 0)
-            else:
-                amount = 0
-            clean_transactions.append(
-                MonthUsageSum(
-                    month=current_month.date(),
-                    amount=amount,
-                )
-            )
-        return clean_transactions

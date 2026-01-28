@@ -7,7 +7,7 @@ from dateutil.relativedelta import relativedelta
 from dateutil.rrule import MONTHLY, WEEKLY, rrule
 from django.db.models import FloatField, Prefetch, Q, QuerySet, Sum, Value
 from django.db.models.fields.json import KeyTextTransform
-from django.db.models.functions import Cast, Coalesce, Round, TruncMonth
+from django.db.models.functions import Cast, Coalesce, TruncMonth
 
 from budget import utils
 from budget.constants import BudgetDuplicateType
@@ -20,36 +20,16 @@ from budget.entities import (
     GroupedBudgetModel,
     MonthUsageSum,
 )
-from budget.exceptions import UnsupportedDuplicateTypeError
 from budget.models import Budget, BudgetSeries
+from budget.services.duplication_service import (
+    BudgetDuplicationService,
+)
 from budget.services.entity_transformer import BudgetEntityTransformer
 from budget.services.multicurrency_service import BudgetMulticurrencyService
 from categories import constants
 from transactions.models import Transaction
 from users.models import User
 from workspaces.models import Workspace
-
-RECURRENT_TYPE_MAPPING = {
-    BudgetDuplicateType.MONTHLY: {
-        "start_date": utils.get_first_day_of_prev_month,
-        "end_date": utils.get_last_day_of_prev_month,
-        "relative_date": relativedelta(months=1),
-        "relative_usage": relativedelta(months=5),
-    },
-    BudgetDuplicateType.WEEKLY: {
-        "start_date": utils.get_first_day_of_prev_week,
-        "end_date": utils.get_last_day_of_prev_week,
-        "relative_date": relativedelta(weeks=1),
-        "relative_usage": relativedelta(weeks=5),
-    },
-    BudgetDuplicateType.OCCASIONAL: {
-        "start_date": utils.get_first_day_of_prev_month,
-        "end_date": utils.get_last_day_of_prev_month,
-        "relative_date": relativedelta(months=1),
-        "relative_usage": relativedelta(months=6),
-        "lookback_months": 6,
-    },
-}
 
 logger = structlog.get_logger()
 
@@ -733,113 +713,41 @@ class BudgetService:
     def get_duplicate_budget_candidates(
         cls, qs, recurrent_type: BudgetDuplicateType, pivot_date: str | None = None
     ) -> list[dict[datetime.date, str]]:
-        if RECURRENT_TYPE_MAPPING.get(recurrent_type) is None:
-            raise UnsupportedDuplicateTypeError
+        """Find budgets that can be duplicated for the next period.
 
-        start_date = RECURRENT_TYPE_MAPPING[recurrent_type]["start_date"](pivot_date)
-        end_date = RECURRENT_TYPE_MAPPING[recurrent_type]["end_date"](pivot_date)
+        DEPRECATED: Use BudgetDuplicationService.get_duplicate_candidates instead.
+        This wrapper will be removed in a future release.
 
-        items = (
-            qs.filter(
-                Q(recurrent=BudgetDuplicateType.OCCASIONAL.value)
-                | (
-                    Q(recurrent=recurrent_type)
-                    & Q(budget_date__range=(start_date, end_date))
-                )
-            )
-            .prefetch_related("currency")
-            .order_by("budget_date")
+        LEGACY: This is part of the old manual duplication system.
+        For new recurring budgets, use BudgetSeries instead.
+        """
+        warnings.warn(
+            "BudgetService.get_duplicate_budget_candidates is deprecated. "
+            "Use BudgetDuplicationService.get_duplicate_candidates instead.",
+            DeprecationWarning,
+            stacklevel=2,
         )
-
-        usage_end_date = RECURRENT_TYPE_MAPPING[recurrent_type]["end_date"]()
-        usage_start_date = (
-            RECURRENT_TYPE_MAPPING[recurrent_type]["start_date"]()
-            - RECURRENT_TYPE_MAPPING[recurrent_type]["relative_usage"]
+        return BudgetDuplicationService.get_duplicate_candidates(
+            qs, recurrent_type, pivot_date
         )
-
-        transactions = Transaction.objects.filter(
-            budget__title__in=items.values_list("title", flat=True),
-            transaction_date__gte=usage_start_date,
-            transaction_date__lte=usage_end_date,
-        ).select_related("multicurrency", "budget__currency")
-
-        output = []
-        for item in items:
-            usage_sum = (
-                transactions.filter(budget__title=item.title)
-                .values("budget__uuid", "budget__title")
-                .annotate(
-                    total_in_currency=Round(
-                        Sum(
-                            Coalesce(
-                                Cast(
-                                    KeyTextTransform(
-                                        item.currency.code, "multicurrency__amount_map"
-                                    ),
-                                    FloatField(),
-                                ),
-                                Value(0, output_field=FloatField()),
-                            )
-                        ),
-                        2,
-                    )
-                )
-            )
-            all_sums = [value["total_in_currency"] for value in usage_sum]
-            avg_sum = (
-                round(sum(all_sums) / len(all_sums), 2) if all_sums else item.amount
-            )
-            upcoming_item_date = (
-                item.budget_date
-                + RECURRENT_TYPE_MAPPING[recurrent_type]["relative_date"]
-            )
-            existing_item = Budget.objects.filter(
-                Q(
-                    title=item.title,
-                    budget_date=upcoming_item_date,
-                )
-            )
-            if not existing_item.exists():
-                output.append(
-                    {
-                        "uuid": item.uuid,
-                        "date": upcoming_item_date,
-                        "title": item.title,
-                        "amount": avg_sum,
-                        "currency": item.currency.sign,
-                        "recurrent": item.recurrent_type,  # Use property instead of database field
-                    }
-                )
-
-        return output
 
     @classmethod
     def duplicate_budget(cls, budgets: list[dict[str, int]], workspace: Workspace):
-        for budget in budgets:
-            budget_item = Budget.objects.get(uuid=budget["uuid"])
-            upcoming_item_date = (budget_item.budget_date) + RECURRENT_TYPE_MAPPING[
-                budget_item.recurrent
-            ]["relative_date"]
-            existing_item = Budget.objects.filter(
-                title=budget_item.title,
-                budget_date=upcoming_item_date,
-            )
-            if not existing_item.exists():
-                budget = Budget.objects.create(
-                    category=budget_item.category,
-                    currency=budget_item.currency,
-                    user=budget_item.user,
-                    title=budget_item.title,
-                    amount=budget["value"] or budget_item.amount,
-                    budget_date=upcoming_item_date,
-                    description=budget_item.description,
-                    recurrent=budget_item.recurrent,
-                    workspace=budget_item.workspace,
-                )
+        """Duplicate budgets for the next period.
 
-                cls.create_budget_multicurrency_amount(
-                    [budget.uuid], workspace=workspace
-                )
+        DEPRECATED: Use BudgetDuplicationService.duplicate_budgets instead.
+        This wrapper will be removed in a future release.
+
+        LEGACY: This is part of the old manual duplication system.
+        For new recurring budgets, use BudgetSeries instead.
+        """
+        warnings.warn(
+            "BudgetService.duplicate_budget is deprecated. "
+            "Use BudgetDuplicationService.duplicate_budgets instead.",
+            DeprecationWarning,
+            stacklevel=2,
+        )
+        return BudgetDuplicationService.duplicate_budgets(budgets, workspace)
 
     @classmethod
     def get_last_months_usage(

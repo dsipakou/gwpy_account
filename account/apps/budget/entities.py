@@ -11,6 +11,12 @@ from transactions.models import Transaction
 
 
 class BudgetTransactionItem(TypedDict):
+    """DEPRECATED: Use BudgetTransactionModel (Pydantic) instead.
+
+    This TypedDict will be removed in a future release.
+    Use model_dump() to convert Pydantic models to dict for API responses.
+    """
+
     uuid: UUID
     currency: UUID
     currency_code: str
@@ -21,6 +27,12 @@ class BudgetTransactionItem(TypedDict):
 
 
 class BudgetItem(TypedDict):
+    """DEPRECATED: Use BudgetModel (Pydantic) instead.
+
+    This TypedDict will be removed in a future release.
+    Use model_dump() to convert Pydantic models to dict for API responses.
+    """
+
     uuid: UUID
     user: UUID
     category: UUID
@@ -255,6 +267,12 @@ class GroupedBudgetModel(pydantic.BaseModel):
 
 
 class BudgetGroupedItem(TypedDict):
+    """DEPRECATED: Use GroupedBudgetModel (Pydantic) instead.
+
+    This TypedDict will be removed in a future release.
+    Use model_dump() to convert Pydantic models to dict for API responses.
+    """
+
     uuid: UUID
     user: UUID
     title: str
@@ -311,18 +329,6 @@ class CategoryModel(pydantic.BaseModel):
                 + amount.get(currency["code"], 0),
                 2,
             )
-
-
-class CategoryItem(TypedDict):
-    uuid: UUID
-    user: UUID
-    category_name: str
-    budgets: list[BudgetGroupedItem]
-    planned: float
-    planned_in_currencies: dict[str, float]
-    spent_in_original_currency: float
-    spent_in_base_currency: float
-    spent_in_currencies: dict[str, float]
 
 
 class MonthUsageSum(pydantic.BaseModel):

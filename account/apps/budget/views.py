@@ -440,15 +440,15 @@ class BudgetSeriesStop(GenericAPIView):
             try:
                 until_date = datetime.datetime.strptime(
                     until_date_str, "%Y-%m-%d"
-                ).date()
+                ).date() - datetime.timedelta(days=1)
             except ValueError:
                 return Response(
                     {"error": "Invalid date format. Use YYYY-MM-DD"},
                     status=status.HTTP_400_BAD_REQUEST,
                 )
         else:
-            # Default to today
-            until_date = datetime.date.today()
+            # Default to one day before today
+            until_date = datetime.date.today() - datetime.timedelta(days=1)
 
         # Validate: until date should not be before start_date
         if until_date < series.start_date:

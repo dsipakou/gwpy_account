@@ -396,61 +396,34 @@ class BudgetService:
         return BudgetMulticurrencyService._get_latest_rates()
 
     @classmethod
-    def load_budget_v2(
-        cls,
-        *,
-        workspace: Workspace,
-        budgets_qs: QuerySet,
-        categories_qs: QuerySet,
-        currencies_qs: QuerySet,
-        transactions_qs: QuerySet,
-        date_from: str,
-        date_to: str,
-        user: str | None,
-    ):
-        date_to_formatted = utils.get_end_of_current_week_datetime(date_to)
-        cls.materialize_budgets(workspace, date_to_formatted)
-        budgets = (
-            budgets_qs.filter(budget_date__lte=date_to, budget_date__gte=date_from)
-            .select_related("currency", "category", "multicurrency", "user", "series")
-            .order_by("budget_date")
-        )
-        parent_categories = categories_qs.filter(
-            parent__isnull=True, type=constants.EXPENSE
-        ).order_by("name")
+    def _initialize_category_map(cls, parent_categories, available_currencies) -> dict:
+        """Create map of all categories from workspace with minimum data.
 
-        available_currencies = list(currencies_qs.values("code", "is_base"))
-        transactions = transactions_qs.filter(
-            transaction_date__lte=date_to,
-            transaction_date__gte=date_from,
-            category__type=constants.EXPENSE,
-        )
-        if user:
-            transactions = transactions.filter(budget__user__uuid=user)
-            budgets = budgets.filter(user__uuid=user)
+        Args:
+            parent_categories: QuerySet of parent Category models
+            available_currencies: List of currency dicts with code and is_base
 
-        transactions = transactions.select_related(
-            "multicurrency",
-            "budget",
-            "budget__category",
-            "currency",
-            "category",
-            "category__parent",
-            "user",
-        )
+        Returns:
+            Dict mapping category UUID to CategoryModel instances
+        """
         categories_map = {}
-
-        date_from_parsed = datetime.datetime.strptime(date_from, "%Y-%m-%d").date()
-        date_to_parsed = datetime.datetime.strptime(date_to, "%Y-%m-%d").date()
-
-        # Create map of all categories from workspace with minimum data
         for category in parent_categories:
             categories_map[category.uuid] = CategoryModel.init(
                 category, available_currencies
             )
+        return categories_map
 
-        # Create grouped budgets with budgets inside for corresponding categories
-        # Counting only planned values here
+    @classmethod
+    def _populate_budget_groups(cls, budgets, categories_map, available_currencies):
+        """Create grouped budgets with planned values.
+
+        Args:
+            budgets: QuerySet of Budget models
+            categories_map: Dict mapping category UUID to CategoryModel
+            available_currencies: List of currency dicts with code and is_base
+
+        Mutates categories_map by adding budget groups and planned values.
+        """
         for budget in budgets:
             category_for_budget = categories_map[budget.category.uuid]
 
@@ -489,7 +462,26 @@ class BudgetService:
                 available_currencies, budget.multicurrency_map
             )
 
-        # Fill in budgets spendings
+    @classmethod
+    def _populate_budget_spending(
+        cls,
+        transactions,
+        categories_map,
+        available_currencies,
+        date_from_parsed,
+        date_to_parsed,
+    ):
+        """Fill in budget spending from transactions.
+
+        Args:
+            transactions: QuerySet of Transaction models
+            categories_map: Dict mapping category UUID to CategoryModel
+            available_currencies: List of currency dicts with code and is_base
+            date_from_parsed: Start date as datetime.date
+            date_to_parsed: End date as datetime.date
+
+        Mutates categories_map by adding transaction spending to budgets.
+        """
         for transaction in transactions:
             # Prepare transaction model
             transaction_model = BudgetTransactionModel.init(transaction)
@@ -601,7 +593,16 @@ class BudgetService:
                 if transaction_category != transaction_budget_category:
                     simple_budget_budget_item.transactions.append(transaction_model)
 
-        # Prepare output list
+    @classmethod
+    def _finalize_output(cls, categories_map) -> list[dict]:
+        """Convert category map to output list format.
+
+        Args:
+            categories_map: Dict mapping category UUID to CategoryModel
+
+        Returns:
+            List of category dicts with nested budgets and items
+        """
         output = list(categories_map.values())
         for cat in output:
             cat.budgets = list(cat.budgets_map.values())
@@ -609,6 +610,96 @@ class BudgetService:
                 bud.items = list(bud.items_map.values())
 
         return [item.dict() for item in output]
+
+    @classmethod
+    def load_budget_v2(
+        cls,
+        *,
+        workspace: Workspace,
+        budgets_qs: QuerySet,
+        categories_qs: QuerySet,
+        currencies_qs: QuerySet,
+        transactions_qs: QuerySet,
+        date_from: str,
+        date_to: str,
+        user: str | None,
+    ):
+        """Generate monthly budget report with spending analysis.
+
+        This method orchestrates the budget reporting workflow:
+        1. Materialize budget series for the period
+        2. Initialize category structure
+        3. Populate planned budget values
+        4. Add transaction spending data
+        5. Format output for API response
+
+        Args:
+            workspace: Workspace to filter data
+            budgets_qs: QuerySet of Budget models
+            categories_qs: QuerySet of Category models
+            currencies_qs: QuerySet of Currency models
+            transactions_qs: QuerySet of Transaction models
+            date_from: Start date string (YYYY-MM-DD)
+            date_to: End date string (YYYY-MM-DD)
+            user: Optional user UUID to filter budgets/transactions
+
+        Returns:
+            List of category dicts with nested budget groups and items
+        """
+        # Materialize recurring budgets for the period
+        date_to_formatted = utils.get_end_of_current_week_datetime(date_to)
+        cls.materialize_budgets(workspace, date_to_formatted)
+
+        # Query budgets and categories for the period
+        budgets = (
+            budgets_qs.filter(budget_date__lte=date_to, budget_date__gte=date_from)
+            .select_related("currency", "category", "multicurrency", "user", "series")
+            .order_by("budget_date")
+        )
+        parent_categories = categories_qs.filter(
+            parent__isnull=True, type=constants.EXPENSE
+        ).order_by("name")
+
+        # Query transactions with related data
+        available_currencies = list(currencies_qs.values("code", "is_base"))
+        transactions = transactions_qs.filter(
+            transaction_date__lte=date_to,
+            transaction_date__gte=date_from,
+            category__type=constants.EXPENSE,
+        )
+        if user:
+            transactions = transactions.filter(budget__user__uuid=user)
+            budgets = budgets.filter(user__uuid=user)
+
+        transactions = transactions.select_related(
+            "multicurrency",
+            "budget",
+            "budget__category",
+            "currency",
+            "category",
+            "category__parent",
+            "user",
+        )
+
+        # Parse date strings once
+        date_from_parsed = datetime.datetime.strptime(date_from, "%Y-%m-%d").date()
+        date_to_parsed = datetime.datetime.strptime(date_to, "%Y-%m-%d").date()
+
+        # Build category map with budget groups and spending
+        categories_map = cls._initialize_category_map(
+            parent_categories, available_currencies
+        )
+        cls._populate_budget_groups(budgets, categories_map, available_currencies)
+        cls._populate_budget_spending(
+            transactions,
+            categories_map,
+            available_currencies,
+            date_from_parsed,
+            date_to_parsed,
+        )
+
+        # Format output for API
+        return cls._finalize_output(categories_map)
 
     @classmethod
     def load_weekly_budget(

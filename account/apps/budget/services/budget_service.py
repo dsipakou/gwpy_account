@@ -23,6 +23,33 @@ from workspaces.models import Workspace
 
 
 class BudgetService:
+    """Facade service for budget operations.
+
+    This service provides backward-compatible access to specialized budget services.
+    All methods in this class are deprecated and delegate to the specialized services:
+
+    - BudgetSeriesService: Budget series materialization and occurrence calculation
+    - BudgetMulticurrencyService: Multi-currency conversion operations
+    - BudgetReportingService: Monthly/weekly reports and historical analysis
+    - BudgetEntityTransformer: Entity transformation for API responses
+    - BudgetDuplicationService: Legacy budget duplication (use BudgetSeries instead)
+
+    New code should use the specialized services directly instead of this facade.
+    This facade will be removed in a future release after a deprecation period.
+
+    Migration guide:
+    - BudgetService.materialize_budgets() → BudgetSeriesService.materialize_budgets()
+    - BudgetService.load_budget_v2() → BudgetReportingService.generate_monthly_report()
+    - BudgetService.load_weekly_budget() → BudgetReportingService.generate_weekly_report()
+    - BudgetService.get_last_months_usage() → BudgetReportingService.get_historical_usage()
+    - BudgetService.create_budget_multicurrency_amount() → BudgetMulticurrencyService.create_budget_multicurrency_amount()
+    - BudgetService.make_budgets() → BudgetEntityTransformer.transform_to_budget_items()
+    - BudgetService.make_grouped_budgets() → BudgetEntityTransformer.group_budgets()
+    - BudgetService.make_transactions() → BudgetEntityTransformer.transform_transactions()
+    - BudgetService.get_duplicate_budget_candidates() → BudgetDuplicationService.get_duplicate_candidates()
+    - BudgetService.duplicate_budget() → BudgetDuplicationService.duplicate_budgets()
+    """
+
     @classmethod
     def create_budget_multicurrency_amount(
         cls, uuids: list[UUID], workspace: Workspace

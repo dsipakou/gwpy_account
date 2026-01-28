@@ -14,7 +14,6 @@ from django.db.models.functions import Cast, Coalesce, TruncMonth
 
 from budget import utils
 from budget.entities import (
-    BudgetGroupedItem,
     BudgetItem,
     BudgetModel,
     BudgetTransactionModel,

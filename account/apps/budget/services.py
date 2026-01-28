@@ -4,7 +4,7 @@ from uuid import UUID
 import structlog
 from dateutil.relativedelta import relativedelta
 from dateutil.rrule import MONTHLY, WEEKLY, rrule
-from django.db.models import Count, FloatField, Prefetch, Q, QuerySet, Sum, Value
+from django.db.models import FloatField, Prefetch, Q, QuerySet, Sum, Value
 from django.db.models.fields.json import KeyTextTransform
 from django.db.models.functions import Cast, Coalesce, Round, TruncMonth
 
@@ -16,7 +16,6 @@ from budget.entities import (
     BudgetModel,
     BudgetTransactionItem,
     BudgetTransactionModel,
-    CategoryItem,
     CategoryModel,
     GroupedBudgetModel,
     MonthUsageSum,
@@ -622,58 +621,6 @@ class BudgetService:
         return [item.dict() for item in output]
 
     @classmethod
-    def load_budget(
-        cls,
-        queryset: QuerySet,
-        categories_qs: QuerySet,
-        currency_qs: QuerySet,
-        date_from: datetime.date,
-        date_to: datetime.date,
-        user: str | None,
-    ) -> list[CategoryItem]:
-        cls.start = datetime.datetime.now()
-        logger.debug("budget.service.transaction_prefetch.start")
-        budget_transactions_prefetch = Prefetch(
-            "transaction_set",
-            queryset=Transaction.objects.select_related(
-                "currency", "multicurrency"
-            ).filter(budget__in=queryset),
-            to_attr="transactions",
-        )
-        budgets = (
-            queryset.filter(budget_date__lte=date_to, budget_date__gte=date_from)
-            .prefetch_related(budget_transactions_prefetch)
-            .select_related("currency", "category", "multicurrency", "user", "series")
-            .order_by("budget_date")
-        )
-
-        if user:
-            budgets = budgets.filter(user__uuid=user)
-
-        category_budgets_prefetch = Prefetch(
-            "budget_set",
-            queryset=budgets.filter(workspace=user.active_workspace),
-            to_attr="budgets",
-        )
-        categories = (
-            categories_qs.filter(parent__isnull=True, type=constants.EXPENSE)
-            .prefetch_related(category_budgets_prefetch)
-            .annotate(
-                budget_count=Count(
-                    "budget",
-                    filter=Q(
-                        budget__budget_date__lte=date_to,
-                        budget__budget_date__gte=date_from,
-                    ),
-                ),
-            )
-            .order_by("name")
-        )
-
-        category_list = list(categories)
-        return cls.make_categories(currency_qs, category_list, cls._get_latest_rates())
-
-    @classmethod
     def load_weekly_budget(
         cls,
         qs: QuerySet,
@@ -714,57 +661,6 @@ class BudgetService:
             available_currencies,
             base_currency["code"],
         )
-
-    # TODO: obsolete, was used in old montyly usage calculator
-    # review and delete if needed
-    @classmethod
-    def make_categories(
-        cls, currency_qs: QuerySet, categories, latest_rates
-    ) -> list[CategoryItem]:
-        categories_list = []
-        eval_categories = list(categories)
-        available_currencies = currency_qs.values("code", "is_base")
-        base_currency = available_currencies.get(is_base=True)["code"]
-        for category in eval_categories:
-            budgets = cls.make_grouped_budgets(
-                category.budgets,
-                latest_rates,
-                available_currencies,
-                base_currency,
-            )
-            spent_in_base_currency = sum(
-                item["spent_in_base_currency"] for item in budgets
-            )
-            spent_in_original_currency = sum(
-                item["spent_in_original_currency"] for item in budgets
-            )
-            planned = sum(item["planned"] for item in budgets)
-            planned_in_currencies = {}
-            spent_in_currencies = {}
-            for currency in available_currencies:
-                spent_in_currencies[currency["code"]] = sum(
-                    budget["spent_in_currencies"].get(currency["code"], 0)
-                    for budget in budgets
-                )
-
-                planned_in_currencies[currency["code"]] = sum(
-                    budget["planned_in_currencies"].get(currency["code"], 0)
-                    for budget in budgets
-                )
-
-            categories_list.append(
-                CategoryItem(
-                    uuid=category.uuid,
-                    category_name=category.name,
-                    budgets=budgets,
-                    planned=planned,
-                    planned_in_currencies=planned_in_currencies,
-                    spent_in_base_currency=spent_in_base_currency,
-                    spent_in_original_currency=spent_in_original_currency,
-                    spent_in_currencies=spent_in_currencies,
-                )
-            )
-        return categories_list
 
     @classmethod
     def make_grouped_budgets(

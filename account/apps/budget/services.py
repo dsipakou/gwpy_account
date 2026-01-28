@@ -1,4 +1,5 @@
 import datetime
+import warnings
 from uuid import UUID
 
 import structlog
@@ -21,11 +22,9 @@ from budget.entities import (
     MonthUsageSum,
 )
 from budget.exceptions import UnsupportedDuplicateTypeError
-from budget.models import Budget, BudgetMulticurrency, BudgetSeries
+from budget.models import Budget, BudgetSeries
+from budget.services.multicurrency_service import BudgetMulticurrencyService
 from categories import constants
-from currencies.models import Currency
-from rates.models import Rate
-from rates.utils import generate_amount_map
 from transactions.models import Transaction
 from users.models import User
 from workspaces.models import Workspace
@@ -60,15 +59,20 @@ class BudgetService:
     def create_budget_multicurrency_amount(
         cls, uuids: list[UUID], workspace: Workspace
     ):
-        budgets = Budget.objects.select_related("currency").filter(uuid__in=uuids)
-        dates = budgets.values_list("budget_date", flat=True).distinct()
-        rates_on_date = Rate.objects.filter(rate_date__in=dates)
-        for budget in budgets:
-            amount_map = generate_amount_map(budget, rates_on_date, workspace=workspace)
+        """Create or update multicurrency amounts for budgets.
 
-            BudgetMulticurrency.objects.update_or_create(
-                budget=budget, defaults={"amount_map": amount_map}
-            )
+        DEPRECATED: Use BudgetMulticurrencyService.create_budget_multicurrency_amount instead.
+        This wrapper will be removed in a future release.
+        """
+        warnings.warn(
+            "BudgetService.create_budget_multicurrency_amount is deprecated. "
+            "Use BudgetMulticurrencyService.create_budget_multicurrency_amount instead.",
+            DeprecationWarning,
+            stacklevel=2,
+        )
+        return BudgetMulticurrencyService.create_budget_multicurrency_amount(
+            uuids, workspace
+        )
 
     @classmethod
     def _calculate_occurrences(
@@ -398,12 +402,18 @@ class BudgetService:
 
     @staticmethod
     def _get_latest_rates():
-        latest_rates = {}
-        for currency in Currency.objects.all():
-            rate = Rate.objects.filter(currency=currency).order_by("-rate_date").first()
-            if rate:
-                latest_rates[currency.code] = rate.rate
-        return latest_rates
+        """Get the latest exchange rate for each currency.
+
+        DEPRECATED: Use BudgetMulticurrencyService._get_latest_rates instead.
+        This wrapper will be removed in a future release.
+        """
+        warnings.warn(
+            "BudgetService._get_latest_rates is deprecated. "
+            "Use BudgetMulticurrencyService._get_latest_rates instead.",
+            DeprecationWarning,
+            stacklevel=2,
+        )
+        return BudgetMulticurrencyService._get_latest_rates()
 
     @classmethod
     def load_budget_v2(

@@ -1,7 +1,6 @@
 import datetime
 
 import structlog
-from dateutil.relativedelta import relativedelta
 from django.db import transaction
 from rest_framework import status
 from rest_framework.exceptions import ValidationError
@@ -14,10 +13,10 @@ from rest_framework.generics import (
 from rest_framework.response import Response
 
 from budget import serializers
-from budget.constants import BudgetDuplicateType
-from budget.models import Budget, BudgetSeries, BudgetSeriesException
+from budget.models import Budget
 from budget.serializers import DuplicateResponseSerializer
 from budget.services import BudgetService
+from budget.services.series_service import BudgetSeriesService
 from categories.models import Category
 from currencies.models import Currency
 from transactions.models import Transaction
@@ -73,288 +72,36 @@ class BudgetDetails(RetrieveUpdateDestroyAPIView):
 
     @transaction.atomic
     def perform_update(self, serializer):
-        """Check if category is parent category and handle series splitting
-
-        When a budget with a series is updated and significant fields change,
-        stop the old series and create a new one with updated values.
+        """Check if category is parent category and handle series changes
 
         Raises:
             ValidationError: when category is not parent category
         """
         # Get the old instance before changes
         old_instance = self.get_object()
-        old_series = old_instance.series
 
+        # Validate category
         category = serializer.validated_data.get("category")
         if category and category.parent is not None:
             raise ValidationError("Only parent categories can be used for budgets.")
 
-        # NEW BLOCK: Handle recurrent changes that require future budget cleanup
-        if old_series and old_instance.budget_date:
-            new_recurrent = serializer.validated_data.get(
-                "recurrent", old_instance.recurrent_type
-            )
+        # Handle series changes via service
+        new_series = BudgetSeriesService.update_budget_series(
+            budget=old_instance,
+            validated_data=serializer.validated_data,
+        )
 
-            # Map recurrent types to frequencies
-            frequency_map = {
-                BudgetDuplicateType.WEEKLY.value: BudgetSeries.Frequency.WEEKLY,
-                BudgetDuplicateType.MONTHLY.value: BudgetSeries.Frequency.MONTHLY,
-            }
-            new_frequency = frequency_map.get(new_recurrent) if new_recurrent else None
+        # Update series in validated data
+        if new_series is not None:
+            serializer.validated_data["series"] = new_series
+        elif (
+            "recurrent" in serializer.validated_data
+            and not serializer.validated_data["recurrent"]
+        ):
+            # Explicitly set to None when converting to non-recurrent
+            serializer.validated_data["series"] = None
 
-            # Determine if we need to clean up future budgets
-            needs_cleanup = False
-            cleanup_reason = None
-
-            # Case 1: Converting to non-recurrent (handles both None and empty string "")
-            if not new_recurrent and old_instance.recurrent_type is not None:
-                needs_cleanup = True
-                cleanup_reason = "converted_to_non_recurrent"
-
-            # Case 2: Changing frequency (weekly↔monthly)
-            elif new_frequency and new_frequency != old_series.frequency:
-                needs_cleanup = True
-                cleanup_reason = "frequency_changed"
-
-            if needs_cleanup:
-                # Calculate previous occurrence date
-                if old_series.frequency == BudgetSeries.Frequency.WEEKLY:
-                    delta = relativedelta(weeks=old_series.interval)
-                else:  # MONTHLY
-                    delta = relativedelta(months=old_series.interval)
-
-                previous_date = old_instance.budget_date - delta
-
-                # Find all future budgets in the series (from current date forward)
-                future_budgets = Budget.objects.filter(
-                    series=old_series, budget_date__gte=old_instance.budget_date
-                ).prefetch_related("transaction_set")
-
-                deleted_count = 0
-                unlinked_count = 0
-
-                for future_budget in future_budgets:
-                    # If budget has no transactions, delete it
-                    if not future_budget.transaction_set.exists():
-                        future_budget.delete()
-                        deleted_count += 1
-                    else:
-                        # If budget has transactions, unlink it but keep it
-                        # This silently handles budgets that can't be deleted
-                        future_budget.series = None
-                        future_budget.save()
-                        unlinked_count += 1
-
-                # Stop the series at previous occurrence
-                old_series.until = previous_date
-                old_series.save()
-
-                # Handle each case differently after cleanup
-                if cleanup_reason == "converted_to_non_recurrent":
-                    # Just unlink this budget - no new series
-                    serializer.validated_data["series"] = None
-
-                    logger.info(
-                        "budget_series.stopped_by_conversion",
-                        series_uuid=old_series.uuid,
-                        budget_uuid=old_instance.uuid,
-                        budget_date=old_instance.budget_date,
-                        stopped_at=previous_date,
-                        reason=cleanup_reason,
-                        deleted_empty_budgets=deleted_count,
-                        unlinked_budgets_with_transactions=unlinked_count,
-                    )
-
-                elif cleanup_reason == "frequency_changed":
-                    # Create new series with the new frequency
-                    new_series = BudgetSeries.objects.create(
-                        user=old_instance.user,
-                        workspace=old_instance.workspace,
-                        title=old_series.title,
-                        category=old_series.category,
-                        currency=old_series.currency,
-                        amount=old_series.amount,
-                        start_date=old_instance.budget_date,
-                        frequency=new_frequency,
-                        interval=old_series.interval,
-                        count=None,
-                        until=None,
-                    )
-
-                    # Link this budget to new series
-                    serializer.validated_data["series"] = new_series
-
-                    logger.info(
-                        "budget_series.frequency_changed",
-                        old_series_uuid=old_series.uuid,
-                        new_series_uuid=new_series.uuid,
-                        budget_uuid=old_instance.uuid,
-                        budget_date=old_instance.budget_date,
-                        old_frequency=old_series.frequency,
-                        new_frequency=new_frequency,
-                        stopped_at=previous_date,
-                        deleted_empty_budgets=deleted_count,
-                        unlinked_budgets_with_transactions=unlinked_count,
-                    )
-
-                # Skip the rest of series-related logic by using elif below
-        # Check if significant fields changed for a budget with a series
-        elif old_series and old_instance.budget_date:
-            # Fields that trigger series split
-            changed_fields = {}
-
-            # Check amount
-            new_amount = serializer.validated_data.get("amount", old_instance.amount)
-            if new_amount != old_series.amount:
-                changed_fields["amount"] = new_amount
-
-            # Check currency
-            new_currency = serializer.validated_data.get(
-                "currency", old_instance.currency
-            )
-            if new_currency.uuid != old_series.currency.uuid:
-                changed_fields["currency"] = new_currency
-
-            # Check category
-            new_category = serializer.validated_data.get(
-                "category", old_instance.category
-            )
-            if new_category.uuid != old_series.category.uuid:
-                changed_fields["category"] = new_category
-
-            # Check title
-            new_title = serializer.validated_data.get("title", old_instance.title)
-            if new_title != old_series.title:
-                changed_fields["title"] = new_title
-
-            # Check recurrent type (maps to frequency)
-            new_recurrent = serializer.validated_data.get(
-                "recurrent", old_instance.recurrent_type
-            )
-            frequency_map = {
-                BudgetDuplicateType.WEEKLY.value: BudgetSeries.Frequency.WEEKLY,
-                BudgetDuplicateType.MONTHLY.value: BudgetSeries.Frequency.MONTHLY,
-            }
-            new_frequency = frequency_map.get(new_recurrent) if new_recurrent else None
-
-            if new_frequency and new_frequency != old_series.frequency:
-                changed_fields["frequency"] = new_frequency
-
-            # If any significant fields changed, split the series
-            if changed_fields:
-                # Calculate previous occurrence date based on series frequency
-                if old_series.frequency == BudgetSeries.Frequency.WEEKLY:
-                    delta = relativedelta(weeks=old_series.interval)
-                else:  # MONTHLY
-                    delta = relativedelta(months=old_series.interval)
-
-                previous_date = old_instance.budget_date - delta
-
-                # Stop old series at previous occurrence
-                old_series.until = previous_date
-                old_series.save()
-
-                # Create new series with updated values
-                new_series = BudgetSeries.objects.create(
-                    user=old_instance.user,
-                    workspace=old_instance.workspace,
-                    title=changed_fields.get("title", old_series.title),
-                    category=changed_fields.get("category", old_series.category),
-                    currency=changed_fields.get("currency", old_series.currency),
-                    amount=changed_fields.get("amount", old_series.amount),
-                    start_date=old_instance.budget_date,
-                    frequency=changed_fields.get("frequency", old_series.frequency),
-                    interval=old_series.interval,
-                    count=None,
-                    until=None,
-                )
-
-                # Update this budget to point to new series
-                serializer.validated_data["series"] = new_series
-
-                # Find all future budgets in the old series (from current date forward)
-                future_budgets = Budget.objects.filter(
-                    series=old_series, budget_date__gte=old_instance.budget_date
-                ).prefetch_related("transaction_set")
-
-                reassigned_count = 0
-                updated_count = 0
-                for future_budget in future_budgets:
-                    # Reassign to new series
-                    future_budget.series = new_series
-                    reassigned_count += 1
-
-                    # Update values only if budget has no transactions (empty budget)
-                    if not future_budget.transaction_set.exists():
-                        if "amount" in changed_fields:
-                            future_budget.amount = changed_fields["amount"]
-                        if "currency" in changed_fields:
-                            future_budget.currency = changed_fields["currency"]
-                        if "category" in changed_fields:
-                            future_budget.category = changed_fields["category"]
-                        if "title" in changed_fields:
-                            future_budget.title = changed_fields["title"]
-                        updated_count += 1
-
-                    future_budget.save()
-
-                logger.info(
-                    "budget_series.split",
-                    old_series_uuid=old_series.uuid,
-                    new_series_uuid=new_series.uuid,
-                    budget_uuid=old_instance.uuid,
-                    budget_date=old_instance.budget_date,
-                    stopped_old_at=previous_date,
-                    changed_fields=list(changed_fields.keys()),
-                    reassigned_budgets=reassigned_count,
-                    updated_budgets=updated_count,
-                )
-
-        # Create series if budget doesn't have one but recurrent type is set
-        elif not old_series and old_instance.budget_date:
-            new_recurrent = serializer.validated_data.get("recurrent")
-
-            # Only create series for weekly/monthly recurrent types
-            if new_recurrent in (
-                BudgetDuplicateType.WEEKLY.value,
-                BudgetDuplicateType.MONTHLY.value,
-            ):
-                frequency_map = {
-                    BudgetDuplicateType.WEEKLY.value: BudgetSeries.Frequency.WEEKLY,
-                    BudgetDuplicateType.MONTHLY.value: BudgetSeries.Frequency.MONTHLY,
-                }
-                frequency = frequency_map[new_recurrent]
-
-                # Get values from validated_data or fall back to old_instance
-                new_series = BudgetSeries.objects.create(
-                    user=old_instance.user,
-                    workspace=old_instance.workspace,
-                    title=serializer.validated_data.get("title", old_instance.title),
-                    category=serializer.validated_data.get(
-                        "category", old_instance.category
-                    ),
-                    currency=serializer.validated_data.get(
-                        "currency", old_instance.currency
-                    ),
-                    amount=serializer.validated_data.get("amount", old_instance.amount),
-                    start_date=old_instance.budget_date,
-                    frequency=frequency,
-                    interval=1,
-                    count=None,
-                    until=None,
-                )
-
-                # Update this budget to point to new series
-                serializer.validated_data["series"] = new_series
-
-                logger.info(
-                    "budget_series.created",
-                    series_uuid=new_series.uuid,
-                    budget_uuid=old_instance.uuid,
-                    budget_date=old_instance.budget_date,
-                    frequency=frequency,
-                )
-
+        # Save and create multicurrency
         instance = serializer.save()
         BudgetService.create_budget_multicurrency_amount(
             [instance.uuid], workspace=instance.workspace
@@ -362,26 +109,8 @@ class BudgetDetails(RetrieveUpdateDestroyAPIView):
 
     @transaction.atomic
     def perform_destroy(self, instance):
-        """Track deletion in BudgetSeriesException if budget belongs to a series
-
-        When a budget that's part of a series is deleted, create an exception
-        record so the materialization service won't recreate it. All budgets
-        are treated equally - no special handling for parent/original budgets.
-        """
-        # Only track if budget has both series and date
-        if instance.series and instance.budget_date:
-            BudgetSeriesException.objects.get_or_create(
-                series=instance.series,
-                date=instance.budget_date,
-                defaults={"is_skipped": True},
-            )
-            logger.info(
-                "budget_deleted.exception_created",
-                budget_uuid=instance.uuid,
-                series_uuid=instance.series.uuid,
-                date=instance.budget_date,
-            )
-
+        """Delete budget and track in exceptions if part of a series"""
+        BudgetSeriesService.track_deletion(instance)
         instance.delete()
 
 
@@ -554,7 +283,7 @@ class BudgetSeriesStop(GenericAPIView):
 
         series = budget.series
 
-        # Get until date from request or use today
+        # Parse until date from request or use yesterday as default
         until_date_str = request.data.get("until")
         if until_date_str:
             try:
@@ -570,49 +299,9 @@ class BudgetSeriesStop(GenericAPIView):
             # Default to one day before today
             until_date = datetime.date.today() - datetime.timedelta(days=1)
 
-        # Handle future budgets after the until_date
-        # - Budgets WITHOUT transactions: delete them
-        # - Budgets WITH transactions: unlink from series but keep them
-        future_budgets = Budget.objects.filter(
-            series=series, budget_date__gt=until_date
-        ).prefetch_related("transaction_set")
-
-        deleted_count = 0
-        unlinked_count = 0
-
-        for future_budget in future_budgets:
-            if not future_budget.transaction_set.exists():
-                # No transactions - safe to delete
-                future_budget.delete()
-                deleted_count += 1
-            else:
-                # Has transactions - unlink from series but keep the budget
-                future_budget.series = None
-                future_budget.save()
-                unlinked_count += 1
-
-        # Enddate should be less then start date
-        until_date = max(until_date, series.start_date)
-
-        # Delete all exceptions for dates > until_date
-        # (they're no longer relevant since series ends at until_date)
-        deleted_exceptions = BudgetSeriesException.objects.filter(
-            series=series, date__gt=until_date
-        ).delete()[0]
-
-        # Update series
-        series.until = until_date
-        series.save()
-
-        logger.info(
-            "budget_series.stopped",
-            series_uuid=series.uuid,
-            series_title=series.title,
-            until=until_date,
-            stopped_by=request.user.uuid,
-            deleted_budgets=deleted_count,
-            unlinked_budgets_with_transactions=unlinked_count,
-            deleted_exceptions=deleted_exceptions,
+        # Stop series via service
+        deleted_count, unlinked_count, deleted_exceptions = (
+            BudgetSeriesService.stop_series(series=series, until_date=until_date)
         )
 
         return Response(

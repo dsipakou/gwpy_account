@@ -34,7 +34,11 @@ class BudgetReportingService:
     """Service for budget reporting and analysis."""
 
     @classmethod
-    def _initialize_category_map(cls, parent_categories, available_currencies) -> dict:
+    def _initialize_category_map(
+        cls,
+        parent_categories: QuerySet,
+        available_currencies: list[dict[str, str | bool]],
+    ) -> dict:
         """Create map of all categories from workspace with minimum data.
 
         Args:
@@ -52,7 +56,12 @@ class BudgetReportingService:
         return categories_map
 
     @classmethod
-    def _populate_budget_groups(cls, budgets, categories_map, available_currencies):
+    def _populate_budget_groups(
+        cls,
+        budgets: QuerySet,
+        categories_map: dict,
+        available_currencies: list[dict[str, str | bool]],
+    ) -> None:
         """Create grouped budgets with planned values.
 
         Args:
@@ -103,12 +112,12 @@ class BudgetReportingService:
     @classmethod
     def _populate_budget_spending(
         cls,
-        transactions,
-        categories_map,
-        available_currencies,
-        date_from_parsed,
-        date_to_parsed,
-    ):
+        transactions: QuerySet,
+        categories_map: dict,
+        available_currencies: list[dict[str, str | bool]],
+        date_from_parsed: datetime.date,
+        date_to_parsed: datetime.date,
+    ) -> None:
         """Fill in budget spending from transactions.
 
         Args:
@@ -232,7 +241,7 @@ class BudgetReportingService:
                     simple_budget_budget_item.transactions.append(transaction_model)
 
     @classmethod
-    def _finalize_output(cls, categories_map) -> list[dict]:
+    def _finalize_output(cls, categories_map: dict) -> list[dict]:
         """Convert category map to output list format.
 
         Args:
@@ -261,7 +270,7 @@ class BudgetReportingService:
         date_from: str,
         date_to: str,
         user: str | None,
-    ):
+    ) -> list[dict]:
         """Generate monthly budget report with spending analysis.
 
         This method orchestrates the budget reporting workflow:
@@ -344,8 +353,8 @@ class BudgetReportingService:
         cls,
         qs: QuerySet,
         currency_qs: QuerySet,
-        date_from,
-        date_to,
+        date_from: str | datetime.date,
+        date_to: str | datetime.date,
         workspace: Workspace,
         user: str | None,
     ) -> list[BudgetItem]:

@@ -9,6 +9,7 @@ This service will be deprecated once all users migrate to the series system.
 """
 
 import datetime
+from typing import TYPE_CHECKING
 
 from dateutil.relativedelta import relativedelta
 from django.db.models import FloatField, Q, Sum, Value
@@ -22,6 +23,9 @@ from budget.models import Budget
 from budget.services.multicurrency_service import BudgetMulticurrencyService
 from transactions.models import Transaction
 from workspaces.models import Workspace
+
+if TYPE_CHECKING:
+    from django.db.models import QuerySet
 
 # Legacy mapping for budget duplication types
 RECURRENT_TYPE_MAPPING = {
@@ -56,8 +60,11 @@ class BudgetDuplicationService:
 
     @classmethod
     def get_duplicate_candidates(
-        cls, qs, recurrent_type: BudgetDuplicateType, pivot_date: str | None = None
-    ) -> list[dict[datetime.date, str]]:
+        cls,
+        qs: "QuerySet",
+        recurrent_type: BudgetDuplicateType,
+        pivot_date: str | None = None,
+    ) -> list[dict[str, str | datetime.date | float]]:
         """Find budgets that can be duplicated for the next period.
 
         Args:
@@ -152,7 +159,9 @@ class BudgetDuplicationService:
         return output
 
     @classmethod
-    def duplicate_budgets(cls, budgets: list[dict[str, int]], workspace: Workspace):
+    def duplicate_budgets(
+        cls, budgets: list[dict[str, str | float]], workspace: Workspace
+    ) -> None:
         """Duplicate budgets for the next period.
 
         Args:

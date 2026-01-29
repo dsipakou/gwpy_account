@@ -4,9 +4,14 @@ Handles transformation of budget and transaction Django models into
 TypedDict/Pydantic entities for API responses.
 """
 
+from typing import TYPE_CHECKING
+
 import structlog
 
 from budget.entities import BudgetGroupedItem, BudgetItem, BudgetTransactionItem
+
+if TYPE_CHECKING:
+    from django.db.models import QuerySet
 
 logger = structlog.get_logger()
 
@@ -16,7 +21,11 @@ class BudgetEntityTransformer:
 
     @classmethod
     def transform_to_budget_items(
-        cls, budgets, latest_rates, available_currencies, base_currency
+        cls,
+        budgets: "QuerySet",
+        latest_rates: dict[str, float],
+        available_currencies: "QuerySet",
+        base_currency: str,
     ) -> list[BudgetItem]:
         """Transform budget QuerySet into BudgetItem TypedDicts.
 
@@ -109,7 +118,11 @@ class BudgetEntityTransformer:
 
     @classmethod
     def group_budgets(
-        cls, budgets, latest_rates, available_currencies, base_currency
+        cls,
+        budgets: "QuerySet",
+        latest_rates: dict[str, float],
+        available_currencies: "QuerySet",
+        base_currency: str,
     ) -> list[BudgetGroupedItem]:
         """Group budgets by title and aggregate spending/planning.
 
@@ -167,7 +180,10 @@ class BudgetEntityTransformer:
 
     @classmethod
     def transform_transactions(
-        cls, transactions, latest_rates, base_currency_code: str
+        cls,
+        transactions: "QuerySet",
+        latest_rates: dict[str, float],
+        base_currency_code: str,
     ) -> list[dict]:
         """Transform transaction QuerySet into TypedDict list.
 

@@ -19,7 +19,7 @@ class BudgetMulticurrencyService:
     @classmethod
     def create_budget_multicurrency_amount(
         cls, uuids: list[UUID], workspace: Workspace
-    ):
+    ) -> None:
         """Create or update multicurrency amounts for budgets.
 
         Args:
@@ -40,7 +40,7 @@ class BudgetMulticurrencyService:
             )
 
     @classmethod
-    def _get_latest_rates(cls):
+    def _get_latest_rates(cls) -> dict[str, float]:
         """Get the latest exchange rate for each currency.
 
         Returns:

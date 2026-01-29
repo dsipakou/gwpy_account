@@ -89,8 +89,117 @@ class BudgetDetails(RetrieveUpdateDestroyAPIView):
         if category and category.parent is not None:
             raise ValidationError("Only parent categories can be used for budgets.")
 
-        # Check if significant fields changed for a budget with a series
+        # NEW BLOCK: Handle recurrent changes that require future budget cleanup
         if old_series and old_instance.budget_date:
+            new_recurrent = serializer.validated_data.get(
+                "recurrent", old_instance.recurrent_type
+            )
+
+            # Map recurrent types to frequencies
+            frequency_map = {
+                BudgetDuplicateType.WEEKLY.value: BudgetSeries.Frequency.WEEKLY,
+                BudgetDuplicateType.MONTHLY.value: BudgetSeries.Frequency.MONTHLY,
+            }
+            new_frequency = frequency_map.get(new_recurrent) if new_recurrent else None
+
+            # Determine if we need to clean up future budgets
+            needs_cleanup = False
+            cleanup_reason = None
+
+            # Case 1: Converting to non-recurrent (handles both None and empty string "")
+            if not new_recurrent and old_instance.recurrent_type is not None:
+                needs_cleanup = True
+                cleanup_reason = "converted_to_non_recurrent"
+
+            # Case 2: Changing frequency (weekly↔monthly)
+            elif new_frequency and new_frequency != old_series.frequency:
+                needs_cleanup = True
+                cleanup_reason = "frequency_changed"
+
+            if needs_cleanup:
+                # Calculate previous occurrence date
+                if old_series.frequency == BudgetSeries.Frequency.WEEKLY:
+                    delta = relativedelta(weeks=old_series.interval)
+                else:  # MONTHLY
+                    delta = relativedelta(months=old_series.interval)
+
+                previous_date = old_instance.budget_date - delta
+
+                # Find all future budgets in the series (from current date forward)
+                future_budgets = Budget.objects.filter(
+                    series=old_series, budget_date__gte=old_instance.budget_date
+                ).prefetch_related("transaction_set")
+
+                deleted_count = 0
+                unlinked_count = 0
+
+                for future_budget in future_budgets:
+                    # If budget has no transactions, delete it
+                    if not future_budget.transaction_set.exists():
+                        future_budget.delete()
+                        deleted_count += 1
+                    else:
+                        # If budget has transactions, unlink it but keep it
+                        # This silently handles budgets that can't be deleted
+                        future_budget.series = None
+                        future_budget.save()
+                        unlinked_count += 1
+
+                # Stop the series at previous occurrence
+                old_series.until = previous_date
+                old_series.save()
+
+                # Handle each case differently after cleanup
+                if cleanup_reason == "converted_to_non_recurrent":
+                    # Just unlink this budget - no new series
+                    serializer.validated_data["series"] = None
+
+                    logger.info(
+                        "budget_series.stopped_by_conversion",
+                        series_uuid=old_series.uuid,
+                        budget_uuid=old_instance.uuid,
+                        budget_date=old_instance.budget_date,
+                        stopped_at=previous_date,
+                        reason=cleanup_reason,
+                        deleted_empty_budgets=deleted_count,
+                        unlinked_budgets_with_transactions=unlinked_count,
+                    )
+
+                elif cleanup_reason == "frequency_changed":
+                    # Create new series with the new frequency
+                    new_series = BudgetSeries.objects.create(
+                        user=old_instance.user,
+                        workspace=old_instance.workspace,
+                        title=old_series.title,
+                        category=old_series.category,
+                        currency=old_series.currency,
+                        amount=old_series.amount,
+                        start_date=old_instance.budget_date,
+                        frequency=new_frequency,
+                        interval=old_series.interval,
+                        count=None,
+                        until=None,
+                    )
+
+                    # Link this budget to new series
+                    serializer.validated_data["series"] = new_series
+
+                    logger.info(
+                        "budget_series.frequency_changed",
+                        old_series_uuid=old_series.uuid,
+                        new_series_uuid=new_series.uuid,
+                        budget_uuid=old_instance.uuid,
+                        budget_date=old_instance.budget_date,
+                        old_frequency=old_series.frequency,
+                        new_frequency=new_frequency,
+                        stopped_at=previous_date,
+                        deleted_empty_budgets=deleted_count,
+                        unlinked_budgets_with_transactions=unlinked_count,
+                    )
+
+                # Skip the rest of series-related logic by using elif below
+        # Check if significant fields changed for a budget with a series
+        elif old_series and old_instance.budget_date:
             # Fields that trigger series split
             changed_fields = {}
 
@@ -414,25 +523,36 @@ class LastMonthsBudgetUsageList(ListAPIView):
 class BudgetSeriesStop(GenericAPIView):
     """Stop a budget series from materializing future budgets"""
 
-    queryset = BudgetSeries.objects.all()
+    queryset = Budget.objects.all()
     permission_classes = (BaseUserPermission,)
     lookup_field = "uuid"
 
     @transaction.atomic
     def post(self, request, uuid):
-        """Stop the series at a specified date or today
+        """Stop the series at a specified date
+
+        Accepts a budget UUID and stops the series associated with that budget.
 
         Request body (optional):
         {
-            "until": "2024-12-31"  # Stop series at this date (optional, defaults to today)
+            "until": "2024-12-31"  # Stop series at this date (optional, defaults to yesterday)
         }
         """
+        # Get the budget and its associated series
         try:
-            series = self.get_queryset().get(uuid=uuid)
-        except BudgetSeries.DoesNotExist:
+            budget = self.get_queryset().select_related("series").get(uuid=uuid)
+        except Budget.DoesNotExist:
             return Response(
-                {"error": "Series not found"}, status=status.HTTP_404_NOT_FOUND
+                {"error": "Budget not found"}, status=status.HTTP_404_NOT_FOUND
             )
+
+        if not budget.series:
+            return Response(
+                {"error": "Budget is not part of a series"},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+
+        series = budget.series
 
         # Get until date from request or use today
         until_date_str = request.data.get("until")
@@ -450,26 +570,35 @@ class BudgetSeriesStop(GenericAPIView):
             # Default to one day before today
             until_date = datetime.date.today() - datetime.timedelta(days=1)
 
-        # Validate: until date should not be before start_date
-        if until_date < series.start_date:
-            return Response(
-                {
-                    "error": f"until date cannot be before series start_date ({series.start_date})"
-                },
-                status=status.HTTP_400_BAD_REQUEST,
-            )
-
-        # Delete empty budgets (without transactions) after the until_date
+        # Handle future budgets after the until_date
+        # - Budgets WITHOUT transactions: delete them
+        # - Budgets WITH transactions: unlink from series but keep them
         future_budgets = Budget.objects.filter(
             series=series, budget_date__gt=until_date
         ).prefetch_related("transaction_set")
 
         deleted_count = 0
-        for budget in future_budgets:
-            # Only delete if budget has no transactions
-            if not budget.transaction_set.exists():
-                budget.delete()
+        unlinked_count = 0
+
+        for future_budget in future_budgets:
+            if not future_budget.transaction_set.exists():
+                # No transactions - safe to delete
+                future_budget.delete()
                 deleted_count += 1
+            else:
+                # Has transactions - unlink from series but keep the budget
+                future_budget.series = None
+                future_budget.save()
+                unlinked_count += 1
+
+        # Enddate should be less then start date
+        until_date = max(until_date, series.start_date)
+
+        # Delete all exceptions for dates > until_date
+        # (they're no longer relevant since series ends at until_date)
+        deleted_exceptions = BudgetSeriesException.objects.filter(
+            series=series, date__gt=until_date
+        ).delete()[0]
 
         # Update series
         series.until = until_date
@@ -481,7 +610,9 @@ class BudgetSeriesStop(GenericAPIView):
             series_title=series.title,
             until=until_date,
             stopped_by=request.user.uuid,
-            deleted_empty_budgets=deleted_count,
+            deleted_budgets=deleted_count,
+            unlinked_budgets_with_transactions=unlinked_count,
+            deleted_exceptions=deleted_exceptions,
         )
 
         return Response(
@@ -489,7 +620,9 @@ class BudgetSeriesStop(GenericAPIView):
                 "uuid": series.uuid,
                 "title": series.title,
                 "until": until_date,
-                "deleted_empty_budgets": deleted_count,
-                "message": f"Series will stop materializing budgets after {until_date}",
+                "deleted_budgets": deleted_count,
+                "unlinked_budgets": unlinked_count,
+                "deleted_exceptions": deleted_exceptions,
+                "message": f"Series stopped. Deleted {deleted_count} budgets, unlinked {unlinked_count} budgets with transactions, and deleted {deleted_exceptions} exceptions after {until_date}",
             }
         )

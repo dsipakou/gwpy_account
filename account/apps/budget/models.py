@@ -50,6 +50,14 @@ class BudgetSeriesException(models.Model):
     is_skipped = models.BooleanField(default=False)
     override_amount = models.FloatField(null=True, blank=True)
 
+    class Meta:
+        constraints = [
+            models.UniqueConstraint(
+                fields=["series", "date"],
+                name="unique_series_exception_date",
+            )
+        ]
+
 
 class Budget(models.Model):
     RECURRENT_CHOICES = (

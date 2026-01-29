@@ -37,11 +37,24 @@ class BudgetSerializer(serializers.ModelSerializer):
         return data
 
     def create(self, validated_data):
+        """Create a new budget and optionally a new BudgetSeries.
+
+        Series Creation Rules:
+        - Weekly/Monthly budgets: Always creates a NEW independent series
+        - Occasional budgets: No series created
+        - Each budget gets its own series, even with same title/user/frequency
+
+        This design allows users to:
+        1. Create separate budgets with same title for different time periods
+        2. Stop/modify one series without affecting others
+        3. Change amounts/categories over time without conflict
+        4. Have multiple independent lifecycles for same budget title
+        """
         workspace = validated_data["user"].active_workspace
         if not workspace:
             raise ValidationError("User has no active workspace")
 
-        # Handle BudgetSeries creation/linking for WEEKLY and MONTHLY budgets
+        # Handle BudgetSeries creation for WEEKLY and MONTHLY budgets
         series = None
         recurrent = validated_data.get("recurrent")
 
@@ -57,28 +70,21 @@ class BudgetSerializer(serializers.ModelSerializer):
             }
             frequency = frequency_map[recurrent]
 
-            # Look for existing BudgetSeries with same user, title, and frequency
-            series = BudgetSeries.objects.filter(
+            # Always create a new BudgetSeries for this budget
+            # Each budget gets its own independent series, even with the same title
+            series = BudgetSeries.objects.create(
                 user=validated_data["user"],
+                workspace=workspace,
                 title=validated_data["title"],
+                category=validated_data["category"],
+                currency=validated_data["currency"],
+                amount=validated_data["amount"],
+                start_date=validated_data["budget_date"],
                 frequency=frequency,
-            ).first()
-
-            # Create new BudgetSeries if one doesn't exist
-            if not series:
-                series = BudgetSeries.objects.create(
-                    user=validated_data["user"],
-                    workspace=workspace,
-                    title=validated_data["title"],
-                    category=validated_data["category"],
-                    currency=validated_data["currency"],
-                    amount=validated_data["amount"],
-                    start_date=validated_data["budget_date"],
-                    frequency=frequency,
-                    interval=1,
-                    count=None,
-                    until=None,
-                )
+                interval=1,
+                count=None,
+                until=None,
+            )
 
         data = {
             **validated_data,

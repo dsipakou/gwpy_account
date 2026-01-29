@@ -178,4 +178,5 @@ fly-account
 
 # Claude-code
 .opencode/*
+.claude/*
 CLAUDE.md

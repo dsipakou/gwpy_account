@@ -6,6 +6,7 @@ individual Budget instances from recurring BudgetSeries definitions.
 
 import datetime
 from typing import TYPE_CHECKING
+from uuid import UUID
 
 import structlog
 from dateutil.relativedelta import relativedelta
@@ -52,10 +53,6 @@ class BudgetSeriesService:
             end_date = series.until or to_date
             count = series.count
 
-            if count:
-                skipped_count = series.exceptions.filter(is_skipped=True).count()
-                count = count + skipped_count
-
             occurrence_num = 0
             while True:
                 if count and occurrence_num >= count:
@@ -81,17 +78,12 @@ class BudgetSeriesService:
                 "MONTHLY": MONTHLY,
             }
 
-            count = series.count
-            if count:
-                skipped_count = series.exceptions.filter(is_skipped=True).count()
-                count = count + skipped_count
-
             occurrences = rrule(
                 freq=freq_map[str(series.frequency)],
                 interval=series.interval,  # type: ignore[arg-type]
                 dtstart=series.start_date,
                 until=series.until or to_date,
-                count=count,
+                count=series.count,
             )
             return [dt.date() for dt in occurrences]
 
@@ -382,7 +374,7 @@ class BudgetSeriesService:
         cls,
         budget: "Budget",
         validated_data: dict,
-    ) -> "BudgetSeries | None":
+    ) -> tuple["BudgetSeries | None", list[UUID] | None]:
         """Handle series updates when budget fields change.
 
         Cases handled:
@@ -405,7 +397,7 @@ class BudgetSeriesService:
 
         # Must have a budget_date for series operations
         if not old_budget_date:
-            return old_series
+            return old_series, None
 
         # Import here to avoid circular import
         from budget.constants import BudgetDuplicateType
@@ -464,7 +456,7 @@ class BudgetSeriesService:
                         deleted_empty_budgets=deleted_count,
                         unlinked_budgets_with_transactions=unlinked_count,
                     )
-                    return None
+                    return None, None
 
                 elif cleanup_reason == "frequency_changed":
                     # Create new series with the new frequency
@@ -487,7 +479,105 @@ class BudgetSeriesService:
                         deleted_empty_budgets=deleted_count,
                         unlinked_budgets_with_transactions=unlinked_count,
                     )
-                    return new_series
+                    return new_series, None
+
+        # Case 1.5: Handle count-only updates (before checking significant changes)
+        if old_series and "number_of_repetitions" in validated_data:
+            new_count = validated_data["number_of_repetitions"]
+            old_count = old_series.count
+
+            # Check if ONLY count changed (no other significant fields)
+            temp_changed_fields = cls._detect_significant_changes(
+                budget, old_series, validated_data
+            )
+
+            if not temp_changed_fields and new_count != old_count:
+                # Count-only update - handle without series split
+                from datetime import timedelta
+
+                # If reducing count, delete extra budgets beyond new limit
+                if new_count is not None and (
+                    old_count is None or new_count < old_count
+                ):
+                    # Calculate which occurrence number this budget is
+                    current_occurrence = 0
+                    test_date = old_series.start_date
+                    while test_date < old_budget_date:
+                        current_occurrence += 1
+                        if old_series.frequency == "MONTHLY":
+                            test_date = old_series.start_date + relativedelta(
+                                months=old_series.interval * current_occurrence
+                            )
+                        else:  # WEEKLY
+                            test_date = old_series.start_date + timedelta(
+                                days=7 * old_series.interval * current_occurrence
+                            )
+
+                    # Calculate the last allowed date based on new count
+                    # Count represents total occurrences (budgets + exceptions)
+                    if old_series.frequency == "MONTHLY":
+                        last_allowed_date = old_series.start_date + relativedelta(
+                            months=old_series.interval * (new_count - 1)
+                        )
+                    else:  # WEEKLY
+                        last_allowed_date = old_series.start_date + timedelta(
+                            days=7 * old_series.interval * (new_count - 1)
+                        )
+
+                    # Delete budgets beyond the new limit
+                    future_budgets = Budget.objects.filter(
+                        series=old_series, budget_date__gt=last_allowed_date
+                    )
+
+                    # Separate budgets with/without transactions
+                    budgets_with_txns = []
+                    budgets_without_txns = []
+
+                    for b in future_budgets.select_related("series"):
+                        if b.transaction_set.exists():
+                            budgets_with_txns.append(b)
+                        else:
+                            budgets_without_txns.append(b)
+
+                    # Delete empty budgets
+                    deleted_count = 0
+                    if budgets_without_txns:
+                        Budget.objects.filter(
+                            uuid__in=[b.uuid for b in budgets_without_txns]
+                        ).delete()
+                        deleted_count = len(budgets_without_txns)
+
+                    # Unlink budgets with transactions
+                    unlinked_count = 0
+                    if budgets_with_txns:
+                        Budget.objects.filter(
+                            uuid__in=[b.uuid for b in budgets_with_txns]
+                        ).update(series=None)
+                        unlinked_count = len(budgets_with_txns)
+
+                    logger.info(
+                        "budget_series.count_reduced",
+                        series_uuid=old_series.uuid,
+                        old_count=old_count,
+                        new_count=new_count,
+                        last_allowed_date=last_allowed_date,
+                        deleted_empty_budgets=deleted_count,
+                        unlinked_budgets_with_transactions=unlinked_count,
+                    )
+
+                # Update the count on existing series
+                old_series.count = new_count
+                old_series.save()
+
+                logger.info(
+                    "budget_series.count_updated",
+                    series_uuid=old_series.uuid,
+                    budget_uuid=budget.uuid,
+                    old_count=old_count,
+                    new_count=new_count,
+                )
+
+                return old_series, None
 
         # Case 2: Check if significant fields changed for a budget with a series
         if old_series and old_budget_date:
@@ -495,44 +585,36 @@ class BudgetSeriesService:
                 budget, old_series, validated_data
             )
 
-            # If any significant fields changed, split the series
+            # If any significant fields changed, update series in place
             if changed_fields:
-                previous_date = cls._calculate_previous_occurrence(
-                    old_budget_date, old_series.frequency, old_series.interval
-                )
+                # Update the series itself with new values
+                if "amount" in changed_fields:
+                    old_series.amount = changed_fields["amount"]
+                if "currency" in changed_fields:
+                    old_series.currency = changed_fields["currency"]
+                if "category" in changed_fields:
+                    old_series.category = changed_fields["category"]
+                if "title" in changed_fields:
+                    old_series.title = changed_fields["title"]
 
-                # Stop old series at previous occurrence
-                old_series.until = previous_date
                 old_series.save()
 
-                # Create new series with updated values
-                new_series = cls._create_series_with_changed_fields(
-                    budget=budget,
-                    old_series=old_series,
-                    changed_fields=changed_fields,
-                    start_date=old_budget_date,
-                )
-
-                # Reassign and update future budgets
-                reassigned_count, updated_count = cls._reassign_future_budgets(
-                    old_series=old_series,
-                    new_series=new_series,
+                # Update all future budgets (including current) with new values
+                updated_count, updated_uuids = cls._update_future_budgets(
+                    series=old_series,
                     from_date=old_budget_date,
                     changed_fields=changed_fields,
                 )
 
                 logger.info(
-                    "budget_series.split",
-                    old_series_uuid=old_series.uuid,
-                    new_series_uuid=new_series.uuid,
+                    "budget_series.updated_in_place",
+                    series_uuid=old_series.uuid,
                     budget_uuid=budget.uuid,
                     budget_date=old_budget_date,
-                    stopped_old_at=previous_date,
                     changed_fields=list(changed_fields.keys()),
-                    reassigned_budgets=reassigned_count,
                     updated_budgets=updated_count,
                 )
-                return new_series
+                return old_series, updated_uuids
 
         # Case 3: Create series if budget doesn't have one but recurrent type is set
         if not old_series and old_budget_date:
@@ -566,9 +648,9 @@ class BudgetSeriesService:
                     budget_date=old_budget_date,
                     frequency=frequency,
                 )
-                return new_series
+                return new_series, None
 
-        return old_series
+        return old_series, None
 
     @staticmethod
     def _calculate_previous_occurrence(
@@ -649,7 +731,6 @@ class BudgetSeriesService:
             Dict of changed fields and their new values
         """
         from budget.constants import BudgetDuplicateType
-        from budget.models import BudgetSeries as BudgetSeriesModel
 
         changed_fields = {}
 
@@ -672,6 +753,10 @@ class BudgetSeriesService:
         new_title = validated_data.get("title", budget.title)
         if new_title != series.title:
             changed_fields["title"] = new_title
+
+        new_date = validated_data.get("budget_date")
+        if new_date != budget.budget_date:
+            changed_fields["budget_date"] = new_date
 
         # Check recurrent type (maps to frequency)
         new_recurrent = validated_data.get("recurrent", budget.recurrent_type)
@@ -716,77 +801,38 @@ class BudgetSeriesService:
             start_date=start_date,
             frequency=frequency,
             interval=1,
-            count=None,
+            count=validated_data.get("number_of_repetitions"),
             until=None,
         )
 
     @staticmethod
-    def _create_series_with_changed_fields(
-        budget: "Budget",
-        old_series: "BudgetSeries",
-        changed_fields: dict,
-        start_date: datetime.date,
-    ) -> "BudgetSeries":
-        """Create a new series with updated field values.
-
-        Args:
-            budget: Current budget instance
-            old_series: Series being split
-            changed_fields: Dict of changed fields and new values
-            start_date: Start date for new series
-
-        Returns:
-            Newly created BudgetSeries
-        """
-        from budget.models import BudgetSeries
-
-        return BudgetSeries.objects.create(
-            user=budget.user,
-            workspace=budget.workspace,
-            title=changed_fields.get("title", old_series.title),
-            category=changed_fields.get("category", old_series.category),
-            currency=changed_fields.get("currency", old_series.currency),
-            amount=changed_fields.get("amount", old_series.amount),
-            start_date=start_date,
-            frequency=changed_fields.get("frequency", old_series.frequency),
-            interval=old_series.interval,
-            count=None,
-            until=None,
-        )
-
-    @staticmethod
-    def _reassign_future_budgets(
-        old_series: "BudgetSeries",
-        new_series: "BudgetSeries",
+    def _update_future_budgets(
+        series: "BudgetSeries",
         from_date: datetime.date,
         changed_fields: dict,
-    ) -> tuple[int, int]:
-        """Reassign future budgets to new series and update their values.
+    ) -> tuple[int, list[UUID]]:
+        """Update future budgets (from current date forward) with new values.
 
         Args:
-            old_series: Old series being split
-            new_series: New series to assign budgets to
-            from_date: Start date (inclusive) for reassignment
+            series: Series containing the budgets
+            from_date: Start date (inclusive) for updates
             changed_fields: Fields that changed and should be updated
 
         Returns:
-            Tuple of (reassigned_count, updated_count)
+            Count of budgets updated
         """
         from budget.models import Budget
 
         future_budgets = Budget.objects.filter(
-            series=old_series, budget_date__gte=from_date
+            series=series, budget_date__gte=from_date
         ).prefetch_related("transaction_set")
 
-        reassigned_count = 0
         updated_count = 0
+        updated_budget_uuids = []
 
         for future_budget in future_budgets:
-            # Reassign to new series
-            future_budget.series = new_series
-            reassigned_count += 1
-
             # Update values only if budget has no transactions (empty budget)
+            # to protect financial records integrity
             if not future_budget.transaction_set.exists():
                 if "amount" in changed_fields:
                     future_budget.amount = changed_fields["amount"]
@@ -796,11 +842,25 @@ class BudgetSeriesService:
                     future_budget.category = changed_fields["category"]
                 if "title" in changed_fields:
                     future_budget.title = changed_fields["title"]
+
+                future_budget.save()
                 updated_count += 1
+                updated_budget_uuids.append(future_budget.uuid)
 
-            future_budget.save()
+        # Update multicurrency amounts for budgets that had amount or currency changes
+        if updated_budget_uuids and (
+            "amount" in changed_fields or "currency" in changed_fields
+        ):
+            BudgetMulticurrencyService.create_budget_multicurrency_amount(
+                updated_budget_uuids, workspace=series.workspace
+            )
+            logger.debug(
+                "budget_series.multicurrency_updated",
+                series_uuid=series.uuid,
+                updated_budgets=len(updated_budget_uuids),
+            )
 
-        return reassigned_count, updated_count
+        return updated_count, updated_budget_uuids
 
     @staticmethod
     def stop_series(
@@ -842,13 +902,19 @@ class BudgetSeriesService:
                 unlinked_count += 1
 
         # Ensure until_date is not before start_date
-        until_date = max(until_date, series.start_date)
 
         # Delete all exceptions for dates > until_date
         # (they're no longer relevant since series ends at until_date)
         deleted_exceptions = BudgetSeriesException.objects.filter(
             series=series, date__gt=until_date
         ).delete()[0]
+
+        budgets_count_after_delete = Budget.objects.filter(series=series).count()
+        # Delete series entirely if until_date is before or on start_date
+        if budgets_count_after_delete == 0 or until_date <= series.start_date:
+            logger.info("budget_series.stopped_and_deleted", series_uuid=series.uuid)
+            series.delete()
+            return deleted_count, unlinked_count, deleted_exceptions
 
         # Update series
         series.until = until_date

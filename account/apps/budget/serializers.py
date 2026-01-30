@@ -6,6 +6,13 @@ from budget.models import Budget, BudgetSeries, BudgetSeriesException
 
 
 class BudgetSerializer(serializers.ModelSerializer):
+    number_of_repetitions = serializers.IntegerField(
+        required=False,
+        allow_null=True,
+        min_value=1,
+        help_text="Number of times this budget should repeat. Null means infinite.",
+    )
+
     class Meta:
         model = Budget
         fields = (
@@ -19,6 +26,7 @@ class BudgetSerializer(serializers.ModelSerializer):
             "budget_date",
             "description",
             "is_completed",
+            "number_of_repetitions",
             "created_at",
             "modified_at",
         )
@@ -34,6 +42,13 @@ class BudgetSerializer(serializers.ModelSerializer):
         # Replace database recurrent field with calculated property
         # (can be "weekly", "monthly", or None)
         data["recurrent"] = instance.recurrent_type
+
+        # Add number_of_repetitions from series
+        if instance.series:
+            data["number_of_repetitions"] = instance.series.count
+        else:
+            data["number_of_repetitions"] = None
+
         return data
 
     def create(self, validated_data):
@@ -53,6 +68,10 @@ class BudgetSerializer(serializers.ModelSerializer):
         workspace = validated_data["user"].active_workspace
         if not workspace:
             raise ValidationError("User has no active workspace")
+
+        # Extract number_of_repetitions before creating Budget instance
+        # (it's not a Budget model field, only used for BudgetSeries)
+        number_of_repetitions = validated_data.pop("number_of_repetitions", None)
 
         # Handle BudgetSeries creation for WEEKLY and MONTHLY budgets
         series = None
@@ -82,7 +101,7 @@ class BudgetSerializer(serializers.ModelSerializer):
                 start_date=validated_data["budget_date"],
                 frequency=frequency,
                 interval=1,
-                count=None,
+                count=number_of_repetitions,
                 until=None,
             )
 

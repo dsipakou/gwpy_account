@@ -1,6 +1,5 @@
 import datetime
 import warnings
-from uuid import UUID
 
 from django.db.models import QuerySet
 
@@ -42,32 +41,12 @@ class BudgetService:
     - BudgetService.load_budget_v2() → BudgetReportingService.generate_monthly_report()
     - BudgetService.load_weekly_budget() → BudgetReportingService.generate_weekly_report()
     - BudgetService.get_last_months_usage() → BudgetReportingService.get_historical_usage()
-    - BudgetService.create_budget_multicurrency_amount() → BudgetMulticurrencyService.create_budget_multicurrency_amount()
     - BudgetService.make_budgets() → BudgetEntityTransformer.transform_to_budget_items()
     - BudgetService.make_grouped_budgets() → BudgetEntityTransformer.group_budgets()
     - BudgetService.make_transactions() → BudgetEntityTransformer.transform_transactions()
     - BudgetService.get_duplicate_budget_candidates() → BudgetDuplicationService.get_duplicate_candidates()
     - BudgetService.duplicate_budget() → BudgetDuplicationService.duplicate_budgets()
     """
-
-    @classmethod
-    def create_budget_multicurrency_amount(
-        cls, uuids: list[UUID], workspace: Workspace
-    ):
-        """Create or update multicurrency amounts for budgets.
-
-        DEPRECATED: Use BudgetMulticurrencyService.create_budget_multicurrency_amount instead.
-        This wrapper will be removed in a future release.
-        """
-        warnings.warn(
-            "BudgetService.create_budget_multicurrency_amount is deprecated. "
-            "Use BudgetMulticurrencyService.create_budget_multicurrency_amount instead.",
-            DeprecationWarning,
-            stacklevel=2,
-        )
-        return BudgetMulticurrencyService.create_budget_multicurrency_amount(
-            uuids, workspace
-        )
 
     @classmethod
     def _calculate_occurrences(

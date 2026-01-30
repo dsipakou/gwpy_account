@@ -2,8 +2,9 @@
 
 from collections import defaultdict
 from datetime import date, timedelta
-from django.db import migrations
+
 from dateutil.relativedelta import relativedelta
+from django.db import migrations
 
 
 def migrate_recurrent_to_series(apps, _schema_editor):
@@ -204,7 +205,7 @@ def migrate_recurrent_to_series(apps, _schema_editor):
                 old_series.delete()
                 series_deleted_count += 1
 
-    print(f"Migration complete:")
+    print("Migration complete:")
     print(f"  - Budgets migrated: {migrated_count}")
     print(f"  - New series created: {series_created_count}")
     print(f"  - Existing series reused: {series_reused_count}")

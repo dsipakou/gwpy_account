@@ -12,6 +12,9 @@ from rest_framework.generics import (
 )
 from rest_framework.response import Response
 
+from account.apps.budget.services.multicurrency_service import (
+    BudgetMulticurrencyService,
+)
 from budget import serializers
 from budget.models import Budget
 from budget.serializers import DuplicateResponseSerializer
@@ -47,7 +50,7 @@ class BudgetList(ListCreateAPIView):
         headers = self.get_success_headers(serializer.data)
         workspace = request.user.active_workspace
 
-        BudgetService.create_budget_multicurrency_amount(
+        BudgetMulticurrencyService.create_budget_multicurrency_amount(
             [instance.uuid], workspace=workspace
         )
 
@@ -86,7 +89,7 @@ class BudgetDetails(RetrieveUpdateDestroyAPIView):
             raise ValidationError("Only parent categories can be used for budgets.")
 
         # Handle series changes via service
-        new_series = BudgetSeriesService.update_budget_series(
+        new_series, updated_uuids = BudgetSeriesService.update_budget_series(
             budget=old_instance,
             validated_data=serializer.validated_data,
         )
@@ -103,8 +106,9 @@ class BudgetDetails(RetrieveUpdateDestroyAPIView):
 
         # Save and create multicurrency
         instance = serializer.save()
-        BudgetService.create_budget_multicurrency_amount(
-            [instance.uuid], workspace=instance.workspace
+        uuids_to_update = updated_uuids if updated_uuids else [instance.uuid]
+        BudgetMulticurrencyService.create_budget_multicurrency_amount(
+            uuids_to_update, workspace=instance.workspace
         )
 
     @transaction.atomic

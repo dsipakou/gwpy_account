@@ -9,15 +9,15 @@ Tests cover:
 
 import datetime
 
-from django.test import TestCase
 from django.contrib.auth import get_user_model
+from django.test import TestCase
 
-from budget.models import Budget, BudgetSeries
+from accounts.models import Account
 from budget.constants import BudgetDuplicateType
+from budget.models import Budget, BudgetSeries
 from categories.models import Category
 from currencies.models import Currency
 from transactions.models import Transaction
-from accounts.models import Account
 from workspaces.models import Workspace
 
 User = get_user_model()
@@ -123,9 +123,10 @@ class RecurrentConversionTestCase(TestCase):
         )
 
         # Convert to non-recurrent by setting recurrent to None
-        from budget.serializers import BudgetSerializer
         from rest_framework.request import Request
         from rest_framework.test import APIRequestFactory
+
+        from budget.serializers import BudgetSerializer
 
         factory = APIRequestFactory()
         request = factory.put("/")
@@ -213,9 +214,10 @@ class RecurrentConversionTestCase(TestCase):
         )
 
         # Convert to non-recurrent by setting recurrent to empty string (frontend sends "")
-        from budget.serializers import BudgetSerializer
         from rest_framework.request import Request
         from rest_framework.test import APIRequestFactory
+
+        from budget.serializers import BudgetSerializer
 
         factory = APIRequestFactory()
         request = factory.put("/")
@@ -305,9 +307,10 @@ class RecurrentConversionTestCase(TestCase):
         )
 
         # Convert to non-recurrent
-        from budget.serializers import BudgetSerializer
         from rest_framework.request import Request
         from rest_framework.test import APIRequestFactory
+
+        from budget.serializers import BudgetSerializer
 
         factory = APIRequestFactory()
         request = factory.put("/")
@@ -383,9 +386,10 @@ class RecurrentConversionTestCase(TestCase):
         )
 
         # Change to monthly
-        from budget.serializers import BudgetSerializer
         from rest_framework.request import Request
         from rest_framework.test import APIRequestFactory
+
+        from budget.serializers import BudgetSerializer
 
         factory = APIRequestFactory()
         request = factory.put("/")
@@ -462,9 +466,10 @@ class RecurrentConversionTestCase(TestCase):
         )
 
         # Change to weekly
-        from budget.serializers import BudgetSerializer
         from rest_framework.request import Request
         from rest_framework.test import APIRequestFactory
+
+        from budget.serializers import BudgetSerializer
 
         factory = APIRequestFactory()
         request = factory.put("/")
@@ -564,9 +569,10 @@ class RecurrentConversionTestCase(TestCase):
         )
 
         # Change to weekly
-        from budget.serializers import BudgetSerializer
         from rest_framework.request import Request
         from rest_framework.test import APIRequestFactory
+
+        from budget.serializers import BudgetSerializer
 
         factory = APIRequestFactory()
         request = factory.put("/")

@@ -1266,3 +1266,356 @@ class TestBudgetSeriesFiniteRepetitions(TestCase):
         budgets_year2 = Budget.objects.filter(series=series).count()
         self.assertGreater(budgets_year2, 100)
         self.assertLess(budgets_year2, 108)
+
+
+class TestBudgetSeriesUpdateSplitScenarios(TestCase):
+    """Test series split scenarios for frequency and date changes"""
+
+    @classmethod
+    def setUpTestData(cls):
+        cls.owner = User.objects.create_user(
+            username="splittest",
+            email="splittest@test.com",
+            password="testpassword",
+        )
+        cls.workspace = Workspace.objects.create(
+            name="Split Test Workspace", owner=cls.owner
+        )
+        cls.owner.active_workspace = cls.workspace
+        cls.owner.save()
+
+        cls.currency = Currency.objects.create(
+            code="USD", sign="$", is_base=True, workspace=cls.workspace
+        )
+        cls.category = Category.objects.create(
+            uuid=uuid.uuid4(), name="Groceries", workspace=cls.workspace
+        )
+        cls.account = Account.objects.create(
+            uuid=uuid.uuid4(),
+            title="Test Account",
+            description="Test account",
+            is_main=True,
+            user=cls.owner,
+            workspace=cls.workspace,
+            category=cls.category,
+        )
+
+    def setUp(self):
+        # Clean up before each test
+        Budget.objects.all().delete()
+        BudgetSeries.objects.all().delete()
+        Transaction.objects.all().delete()
+        BudgetSeriesException.objects.all().delete()
+
+    def test_change_frequency_only(self):
+        """Test changing only frequency (weekly → monthly) keeps same date"""
+        jan_15 = datetime.date(2024, 1, 15)
+        jan_22 = datetime.date(2024, 1, 22)
+        jan_29 = datetime.date(2024, 1, 29)
+
+        # Create weekly series
+        series = BudgetSeries.objects.create(
+            user=self.owner,
+            workspace=self.workspace,
+            title="Weekly Groceries",
+            category=self.category,
+            currency=self.currency,
+            amount=100.0,
+            start_date=jan_15,
+            frequency=BudgetSeries.Frequency.WEEKLY,
+            interval=1,
+        )
+
+        # Create 3 budgets
+        budget1 = Budget.objects.create(
+            user=self.owner,
+            workspace=self.workspace,
+            category=self.category,
+            currency=self.currency,
+            title="Weekly Groceries",
+            amount=100.0,
+            budget_date=jan_15,
+            series=series,
+        )
+        budget2 = Budget.objects.create(
+            user=self.owner,
+            workspace=self.workspace,
+            category=self.category,
+            currency=self.currency,
+            title="Weekly Groceries",
+            amount=100.0,
+            budget_date=jan_22,
+            series=series,
+        )
+        budget3 = Budget.objects.create(
+            user=self.owner,
+            workspace=self.workspace,
+            category=self.category,
+            currency=self.currency,
+            title="Weekly Groceries",
+            amount=100.0,
+            budget_date=jan_29,
+            series=series,
+        )
+
+        # Update budget2 to MONTHLY (frequency change only, no date change)
+        validated_data = {"recurrent_type": BudgetDuplicateType.MONTHLY.value}
+
+        new_series, count_adjustment = BudgetSeriesService.update_budget_series(
+            budget=budget2, validated_data=validated_data
+        )
+
+        # Assertions
+        self.assertIsNotNone(new_series)
+        self.assertEqual(new_series.frequency, BudgetSeries.Frequency.MONTHLY)
+        self.assertEqual(new_series.start_date, jan_22)  # Same date as budget2
+        self.assertNotEqual(new_series.uuid, series.uuid)  # New series created
+
+        # Old series should be stopped at jan_15 (previous occurrence)
+        series.refresh_from_db()
+        self.assertEqual(series.until, jan_15)
+
+        # Budget3 should be deleted (future budget)
+        self.assertFalse(Budget.objects.filter(uuid=budget3.uuid).exists())
+
+        # Budget1 still in old series
+        budget1.refresh_from_db()
+        self.assertEqual(budget1.series, series)
+
+        # Budget2 should be in new series (updated by view after service call)
+        budget2.refresh_from_db()
+        self.assertEqual(budget2.series, new_series)
+
+    def test_change_date_only(self):
+        """Test changing only date (15th → 20th) keeps same frequency"""
+        jan_15 = datetime.date(2024, 1, 15)
+        feb_15 = datetime.date(2024, 2, 15)
+        mar_15 = datetime.date(2024, 3, 15)
+
+        # Create monthly series on 15th
+        series = BudgetSeries.objects.create(
+            user=self.owner,
+            workspace=self.workspace,
+            title="Monthly Groceries",
+            category=self.category,
+            currency=self.currency,
+            amount=200.0,
+            start_date=jan_15,
+            frequency=BudgetSeries.Frequency.MONTHLY,
+            interval=1,
+        )
+
+        # Create 3 budgets
+        budget1 = Budget.objects.create(
+            user=self.owner,
+            workspace=self.workspace,
+            category=self.category,
+            currency=self.currency,
+            title="Monthly Groceries",
+            amount=200.0,
+            budget_date=jan_15,
+            series=series,
+        )
+        budget2 = Budget.objects.create(
+            user=self.owner,
+            workspace=self.workspace,
+            category=self.category,
+            currency=self.currency,
+            title="Monthly Groceries",
+            amount=200.0,
+            budget_date=feb_15,
+            series=series,
+        )
+        budget3 = Budget.objects.create(
+            user=self.owner,
+            workspace=self.workspace,
+            category=self.category,
+            currency=self.currency,
+            title="Monthly Groceries",
+            amount=200.0,
+            budget_date=mar_15,
+            series=series,
+        )
+
+        # Update budget2 date to 20th (date change only, frequency stays MONTHLY)
+        feb_20 = datetime.date(2024, 2, 20)
+        validated_data = {
+            "budget_date": feb_20,
+            "recurrent_type": BudgetDuplicateType.MONTHLY.value,  # Same frequency
+        }
+
+        new_series, count_adjustment = BudgetSeriesService.update_budget_series(
+            budget=budget2, validated_data=validated_data
+        )
+
+        # Assertions
+        self.assertIsNotNone(new_series)
+        self.assertEqual(new_series.frequency, BudgetSeries.Frequency.MONTHLY)
+        self.assertEqual(new_series.start_date, feb_20)  # New date (20th)
+        self.assertNotEqual(new_series.uuid, series.uuid)  # New series created
+
+        # Old series should be stopped at jan_15 (previous occurrence)
+        series.refresh_from_db()
+        self.assertEqual(series.until, jan_15)
+
+        # Budget3 should be deleted (future budget)
+        self.assertFalse(Budget.objects.filter(uuid=budget3.uuid).exists())
+
+        # Budget1 still in old series
+        budget1.refresh_from_db()
+        self.assertEqual(budget1.series, series)
+
+        # Budget2 should be in new series
+        budget2.refresh_from_db()
+        self.assertEqual(budget2.series, new_series)
+
+    def test_change_frequency_and_date_together(self):
+        """Test changing both frequency AND date (weekly on 15th → monthly on 20th)"""
+        jan_15 = datetime.date(2024, 1, 15)
+        jan_22 = datetime.date(2024, 1, 22)
+        jan_29 = datetime.date(2024, 1, 29)
+
+        # Create weekly series on 15th
+        series = BudgetSeries.objects.create(
+            user=self.owner,
+            workspace=self.workspace,
+            title="Weekly Groceries",
+            category=self.category,
+            currency=self.currency,
+            amount=150.0,
+            start_date=jan_15,
+            frequency=BudgetSeries.Frequency.WEEKLY,
+            interval=1,
+        )
+
+        # Create 3 budgets
+        budget1 = Budget.objects.create(
+            user=self.owner,
+            workspace=self.workspace,
+            category=self.category,
+            currency=self.currency,
+            title="Weekly Groceries",
+            amount=150.0,
+            budget_date=jan_15,
+            series=series,
+        )
+        budget2 = Budget.objects.create(
+            user=self.owner,
+            workspace=self.workspace,
+            category=self.category,
+            currency=self.currency,
+            title="Weekly Groceries",
+            amount=150.0,
+            budget_date=jan_22,
+            series=series,
+        )
+        budget3 = Budget.objects.create(
+            user=self.owner,
+            workspace=self.workspace,
+            category=self.category,
+            currency=self.currency,
+            title="Weekly Groceries",
+            amount=150.0,
+            budget_date=jan_29,
+            series=series,
+        )
+
+        # Update budget2: Change frequency to MONTHLY and date to 20th
+        jan_20 = datetime.date(2024, 1, 20)
+        validated_data = {
+            "budget_date": jan_20,
+            "recurrent_type": BudgetDuplicateType.MONTHLY.value,
+        }
+
+        new_series, count_adjustment = BudgetSeriesService.update_budget_series(
+            budget=budget2, validated_data=validated_data
+        )
+
+        # Assertions
+        self.assertIsNotNone(new_series)
+        self.assertEqual(new_series.frequency, BudgetSeries.Frequency.MONTHLY)
+        self.assertEqual(
+            new_series.start_date, jan_20
+        )  # Should use NEW date, not old (jan_22)
+        self.assertNotEqual(new_series.uuid, series.uuid)
+
+        # Old series should be stopped at jan_15
+        series.refresh_from_db()
+        self.assertEqual(series.until, jan_15)
+
+        # Budget3 should be deleted
+        self.assertFalse(Budget.objects.filter(uuid=budget3.uuid).exists())
+
+        # Budget1 still in old series
+        budget1.refresh_from_db()
+        self.assertEqual(budget1.series, series)
+
+        # Budget2 should be in new series
+        budget2.refresh_from_db()
+        self.assertEqual(budget2.series, new_series)
+
+    def test_change_date_ignores_year_difference(self):
+        """Test that changing year but keeping same month/day doesn't trigger split"""
+        jan_15_2024 = datetime.date(2024, 1, 15)
+        feb_15_2024 = datetime.date(2024, 2, 15)
+
+        # Create monthly series
+        series = BudgetSeries.objects.create(
+            user=self.owner,
+            workspace=self.workspace,
+            title="Monthly Savings",
+            category=self.category,
+            currency=self.currency,
+            amount=500.0,
+            start_date=jan_15_2024,
+            frequency=BudgetSeries.Frequency.MONTHLY,
+            interval=1,
+        )
+
+        budget1 = Budget.objects.create(
+            user=self.owner,
+            workspace=self.workspace,
+            category=self.category,
+            currency=self.currency,
+            title="Monthly Savings",
+            amount=500.0,
+            budget_date=jan_15_2024,
+            series=series,
+        )
+        budget2 = Budget.objects.create(
+            user=self.owner,
+            workspace=self.workspace,
+            category=self.category,
+            currency=self.currency,
+            title="Monthly Savings",
+            amount=500.0,
+            budget_date=feb_15_2024,
+            series=series,
+        )
+
+        # Update budget2 to 2025 but same month/day (Feb 15, 2025)
+        feb_15_2025 = datetime.date(2025, 2, 15)
+        validated_data = {
+            "budget_date": feb_15_2025,
+            "recurrent_type": BudgetDuplicateType.MONTHLY.value,
+        }
+
+        returned_series, updated_uuids = BudgetSeriesService.update_budget_series(
+            budget=budget2, validated_data=validated_data
+        )
+
+        # Should NOT trigger split because month/day are same (15th of February)
+        # Instead, updates series in place (Case 2: updated_in_place)
+        self.assertIsNotNone(returned_series)  # Returns old series (updated in place)
+        self.assertEqual(returned_series.uuid, series.uuid)  # Same series, not split
+
+        # Series should be updated with new start_date (Feb 15, 2025)
+        series.refresh_from_db()
+        self.assertEqual(series.start_date, feb_15_2025)  # Updated to new year
+        self.assertIsNone(series.until)  # Still active/infinite
+
+        # Both budgets still in same series
+        budget1.refresh_from_db()
+        budget2.refresh_from_db()
+        self.assertEqual(budget1.series, series)
+        self.assertEqual(budget2.series, series)

@@ -1,7 +1,9 @@
 from django.db import transaction
 
+from account.apps.budget.services.multicurrency_service import (
+    BudgetMulticurrencyService,
+)
 from budget.models import Budget
-from budget.services import BudgetService
 from rates.entities import BatchedRateRequest
 from rates.models import Rate
 from transactions.models import Transaction
@@ -32,7 +34,7 @@ class RateService:
         transaction_uuids = Transaction.objects.filter(
             transaction_date=data["rate_date"], workspace=user.active_workspace
         ).values_list("uuid", flat=True)
-        BudgetService.create_budget_multicurrency_amount(
+        BudgetMulticurrencyService.create_budget_multicurrency_amount(
             budget_uuids, workspace=user.active_workspace
         )
         TransactionService.create_transaction_multicurrency_amount(

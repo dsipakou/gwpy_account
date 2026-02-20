@@ -394,6 +394,7 @@ class BudgetSeriesService:
 
         old_series: BudgetSeries | None = budget.series  # type: ignore[assignment]
         old_budget_date: datetime.date | None = budget.budget_date  # type: ignore[assignment]
+        new_budget_date: datetime.date | None = validated_data.get("budget_date")
 
         # Must have a budget_date for series operations
         if not old_budget_date:
@@ -426,6 +427,14 @@ class BudgetSeriesService:
             elif new_frequency and new_frequency != old_series.frequency:
                 needs_cleanup = True
                 cleanup_reason = "frequency_changed"
+
+            # Case 1c: Changing date (month or day compared to current budget, not series start)
+            elif new_budget_date and (new_budget_date.month, new_budget_date.day) != (
+                old_budget_date.month,
+                old_budget_date.day,
+            ):
+                needs_cleanup = True
+                cleanup_reason = "date_changed"
 
             if needs_cleanup:
                 # Calculate previous occurrence date
@@ -460,11 +469,14 @@ class BudgetSeriesService:
 
                 elif cleanup_reason == "frequency_changed":
                     # Create new series with the new frequency
+                    # Use new_budget_date if date also changed, otherwise old_budget_date
                     new_series = cls._create_series_from_budget(
                         budget=budget,
                         validated_data=validated_data,
                         frequency=new_frequency,
-                        start_date=old_budget_date,
+                        start_date=new_budget_date
+                        if new_budget_date
+                        else old_budget_date,
                     )
 
                     logger.info(
@@ -475,6 +487,31 @@ class BudgetSeriesService:
                         budget_date=old_budget_date,
                         old_frequency=old_series.frequency,
                         new_frequency=new_frequency,
+                        stopped_at=previous_date,
+                        deleted_empty_budgets=deleted_count,
+                        unlinked_budgets_with_transactions=unlinked_count,
+                    )
+                    return new_series, None
+
+                elif cleanup_reason == "date_changed":
+                    # Create new series with the new date (same frequency)
+                    new_series = cls._create_series_from_budget(
+                        budget=budget,
+                        validated_data=validated_data,
+                        frequency=new_frequency
+                        if new_frequency
+                        else old_series.frequency,  # Keep same frequency
+                        start_date=new_budget_date,  # Use new date
+                    )
+
+                    logger.info(
+                        "budget_series.date_changed",
+                        old_series_uuid=old_series.uuid,
+                        new_series_uuid=new_series.uuid,
+                        budget_uuid=budget.uuid,
+                        old_budget_date=old_budget_date,
+                        new_budget_date=new_budget_date,
+                        frequency=old_series.frequency,
                         stopped_at=previous_date,
                         deleted_empty_budgets=deleted_count,
                         unlinked_budgets_with_transactions=unlinked_count,
@@ -596,6 +633,8 @@ class BudgetSeriesService:
                     old_series.category = changed_fields["category"]
                 if "title" in changed_fields:
                     old_series.title = changed_fields["title"]
+                if "budget_date" in changed_fields:
+                    old_series.start_date = changed_fields["budget_date"]
 
                 old_series.save()
 
@@ -833,19 +872,18 @@ class BudgetSeriesService:
         for future_budget in future_budgets:
             # Update values only if budget has no transactions (empty budget)
             # to protect financial records integrity
-            if not future_budget.transaction_set.exists():
-                if "amount" in changed_fields:
-                    future_budget.amount = changed_fields["amount"]
-                if "currency" in changed_fields:
-                    future_budget.currency = changed_fields["currency"]
-                if "category" in changed_fields:
-                    future_budget.category = changed_fields["category"]
-                if "title" in changed_fields:
-                    future_budget.title = changed_fields["title"]
+            if "amount" in changed_fields:
+                future_budget.amount = changed_fields["amount"]
+            if "currency" in changed_fields:
+                future_budget.currency = changed_fields["currency"]
+            if "category" in changed_fields:
+                future_budget.category = changed_fields["category"]
+            if "title" in changed_fields:
+                future_budget.title = changed_fields["title"]
 
-                future_budget.save()
-                updated_count += 1
-                updated_budget_uuids.append(future_budget.uuid)
+            future_budget.save()
+            updated_count += 1
+            updated_budget_uuids.append(future_budget.uuid)
 
         # Update multicurrency amounts for budgets that had amount or currency changes
         if updated_budget_uuids and (

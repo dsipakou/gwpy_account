@@ -1,7 +1,9 @@
 from django.db.models import F, Max, Window
 from django.db.models.functions import RowNumber
+from rest_framework import status
 from rest_framework.generics import (
     CreateAPIView,
+    DestroyAPIView,
     GenericAPIView,
     ListAPIView,
     ListCreateAPIView,
@@ -10,12 +12,13 @@ from rest_framework.generics import (
 from rest_framework.response import Response
 from rest_framework.status import HTTP_400_BAD_REQUEST
 
-from account.apps.rates.entities import RateOnDate
 from currencies.models import Currency
+from rates.entities import RateOnDate
 from rates.filters import DateFilter
 from rates.models import Rate
 from rates.serializers import (
     AvailableRates,
+    ClearRatesOnDateSerializer,
     CreateBatchedRateSerializer,
     RateChartDataSerializer,
     RateChartSerializer,
@@ -23,6 +26,7 @@ from rates.serializers import (
 )
 from rates.services import RateService
 from rates.utils import generate_date_seq
+from transactions.models import Transaction
 from workspaces.filters import FilterByWorkspace
 
 
@@ -74,6 +78,35 @@ class RateDayData(ListAPIView):
     queryset = Rate.objects.all()
     filter_backends = (DateFilter, FilterByWorkspace)
     serializer_class = RateSerializer
+
+
+class ClearRatesOnDateView(DestroyAPIView):
+    queryset = Rate.objects.all()
+    filter_backends = (FilterByWorkspace,)
+    serializer_class = ClearRatesOnDateSerializer
+
+    def destroy(self, request, *args, **kwargs):
+        serializer = ClearRatesOnDateSerializer(data=request.data)
+        serializer.is_valid(raise_exception=True)
+        rate_date = serializer.validated_data["rate_date"]
+
+        instances = self.filter_queryset(self.get_queryset()).filter(
+            rate_date=rate_date
+        )
+
+        if Transaction.objects.filter(
+            transaction_date=rate_date,
+            workspace=request.user.active_workspace,
+        ).exists():
+            return Response(
+                status=status.HTTP_403_FORBIDDEN,
+                data={
+                    "error": "There are transactions on this date, rates cannot be deleted only changed"
+                },
+            )
+
+        instances.delete()
+        return Response(status=status.HTTP_204_NO_CONTENT)
 
 
 class RateDetails(RetrieveUpdateDestroyAPIView):

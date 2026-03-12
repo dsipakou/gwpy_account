@@ -15,4 +15,5 @@ urlpatterns = [
         views.AvailableRates.as_view(),
         name="available_rates",
     ),
+    path("clear/", views.ClearRatesOnDateView.as_view(), name="clear_rates_on_date"),
 ]

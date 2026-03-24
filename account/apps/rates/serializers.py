@@ -30,10 +30,6 @@ class BatchedRateItemSerializer(serializers.Serializer):
     rate = serializers.CharField()
 
 
-class ClearRatesOnDateSerializer(serializers.Serializer):
-    rate_date = serializers.DateField()
-
-
 class CreateBatchedRateSerializer(serializers.Serializer):
     rate_date = serializers.DateField()
     base_currency = serializers.CharField()

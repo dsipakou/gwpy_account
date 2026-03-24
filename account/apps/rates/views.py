@@ -18,7 +18,6 @@ from rates.filters import DateFilter
 from rates.models import Rate
 from rates.serializers import (
     AvailableRates,
-    ClearRatesOnDateSerializer,
     CreateBatchedRateSerializer,
     RateChartDataSerializer,
     RateChartSerializer,
@@ -83,12 +82,13 @@ class RateDayData(ListAPIView):
 class ClearRatesOnDateView(DestroyAPIView):
     queryset = Rate.objects.all()
     filter_backends = (FilterByWorkspace,)
-    serializer_class = ClearRatesOnDateSerializer
 
     def destroy(self, request, *args, **kwargs):
-        serializer = ClearRatesOnDateSerializer(data=request.data)
-        serializer.is_valid(raise_exception=True)
-        rate_date = serializer.validated_data["rate_date"]
+        rate_date = kwargs.get("rate_date")
+        if not rate_date:
+            return Response(
+                status=HTTP_400_BAD_REQUEST, data={"error": "rate_date is required"}
+            )
 
         instances = self.filter_queryset(self.get_queryset()).filter(
             rate_date=rate_date

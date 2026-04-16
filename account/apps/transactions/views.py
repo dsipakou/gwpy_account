@@ -3,6 +3,7 @@ from datetime import date, datetime, timedelta
 
 from django.db import transaction
 from django.db.models.query import QuerySet
+from django.http import HttpResponse
 from django.utils.timezone import now
 from rest_framework import status
 from rest_framework.generics import (
@@ -344,6 +345,52 @@ class TransactionsLastAddedView(ListCreateAPIView):
         serializer.save()
 
         return Response(status=status.HTTP_201_CREATED)
+
+
+class TransactionsByDateRange(ListAPIView):
+    filter_backends = (FilterByUser, FilterByWorkspace)
+    serializer_class = TransactionSerializer
+
+    def get_queryset(self) -> QuerySet:
+        date_from = self.request.GET.get("dateFrom")
+        date_to = self.request.GET.get("dateTo")
+
+        qs = Transaction.objects.select_related(
+            "account",
+            "budget",
+            "category",
+            "category__parent",
+            "currency",
+            "multicurrency",
+            "user",
+        ).order_by("transaction_date")
+
+        if date_from:
+            qs = qs.filter(transaction_date__gte=date_from)
+        if date_to:
+            qs = qs.filter(transaction_date__lte=date_to)
+
+        return qs
+
+    def list(self, request, *args, **kwargs):
+        transactions = TransactionService.proceed_transactions(
+            self.filter_queryset(self.get_queryset())
+        )
+
+        buffer = TransactionService.build_transactions_excel(
+            transactions, workspace=request.user.active_workspace
+        )
+
+        date_from = request.GET.get("dateFrom", "")
+        date_to = request.GET.get("dateTo", "")
+        filename = f"transactions_{date_from}_{date_to}.xlsx".strip("_")
+
+        response = HttpResponse(
+            buffer.getvalue(),
+            content_type="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+        )
+        response["Content-Disposition"] = f'attachment; filename="{filename}"'
+        return response
 
 
 class TransactionBulkCreate(CreateAPIView):

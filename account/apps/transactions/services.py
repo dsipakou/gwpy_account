@@ -1,11 +1,16 @@
 import copy
 import datetime
+import io
+from collections import defaultdict
 from typing import Literal
 from uuid import UUID
 
+import openpyxl
 from django.db.models import QuerySet
+from openpyxl.utils import get_column_letter
 
 from categories import constants as category_constants
+from currencies.models import Currency
 from rates.models import Rate
 from rates.utils import generate_amount_map
 from transactions.entities import (
@@ -221,6 +226,103 @@ class TransactionService:
         for transaction in queryset:
             transactions.append(cls.get_transaction(transaction))
         return transactions
+
+    @classmethod
+    def build_transactions_excel(
+        cls, transactions: list[TransactionItem], workspace: Workspace
+    ) -> io.BytesIO:
+        base_currency = Currency.objects.get(workspace=workspace, is_base=True)
+
+        # group_data[parent][child][date] = list of amounts
+        group_data: dict[str, dict[str, dict[datetime.date, list[float]]]] = (
+            defaultdict(lambda: defaultdict(lambda: defaultdict(list)))
+        )
+        all_dates_set: set[datetime.date] = set()
+
+        for t in transactions:
+            spent = t.get("spent_in_currencies") or {}
+            amount = spent.get(base_currency.code, t["amount"])
+            child = t["category_details"]["name"]
+            parent = t["category_details"]["parent_name"] or child
+            txn_date = t["transaction_date"]
+            group_data[parent][child][txn_date].append(amount)
+            all_dates_set.add(txn_date)
+
+        all_dates = sorted(all_dates_set)
+        date_col_count = len(all_dates)
+        sorted_parents = sorted(group_data.keys())
+
+        # "Другое" sorts last within each group
+        def child_sort_key(name: str) -> tuple:
+            return (name == "Другое", name)
+
+        # Pre-calculate row numbers so SUM formulas can reference exact ranges
+        # Layout: row1=title, row2=grand total, row3=weekdays, row4+=groups
+        HEADER_ROWS = 3
+        current_row = HEADER_ROWS + 1
+        structure: list[tuple] = []
+        summary_rows: list[int] = []
+
+        for parent in sorted_parents:
+            children = sorted(group_data[parent].keys(), key=child_sort_key)
+            summary_row = current_row + 1
+            children_start = current_row + 2
+            children_end = children_start + len(children) - 1
+            summary_rows.append(summary_row)
+            structure.append(("parent", parent, None))
+            structure.append(("sum", parent, (children_start, children_end)))
+            for child in children:
+                structure.append(("child", (parent, child), None))
+            current_row = children_end + 1
+
+        quarter = (all_dates[0].month - 1) // 3 + 1 if all_dates else 1
+
+        wb = openpyxl.Workbook()
+        ws = wb.active
+        ws.title = "Transactions"
+
+        # Row 1: title + dates
+        ws.append([f"Q {quarter}"] + [f"{d.month}/{d.day}/{d.year}" for d in all_dates])
+
+        # Row 2: grand total = SUM of all group Всего rows
+        grand_row: list = [""]
+        for col_idx, _ in enumerate(all_dates, start=2):
+            col = get_column_letter(col_idx)
+            refs = ",".join(f"{col}{r}" for r in summary_rows)
+            grand_row.append(f"=SUM({refs})" if refs else None)
+        ws.append(grand_row)
+
+        # Row 3: weekday names
+        ws.append([""] + [d.strftime("%A") for d in all_dates])
+
+        # Group rows
+        for kind, name, extra in structure:
+            if kind == "parent":
+                ws.append([name] + [None] * date_col_count)
+            elif kind == "sum":
+                children_start, children_end = extra
+                overall_row_data: list = ["Overall"]
+                for col_idx, _ in enumerate(all_dates, start=2):
+                    col = get_column_letter(col_idx)
+                    overall_row_data.append(
+                        f"=SUM({col}{children_start}:{col}{children_end})"
+                    )
+                ws.append(overall_row_data)
+            else:  # child
+                parent, child = name
+                row: list = [child]
+                for d in all_dates:
+                    amounts = group_data[parent][child].get(d)
+                    if amounts:
+                        row.append("=" + "+".join(str(round(a, 2)) for a in amounts))
+                    else:
+                        row.append(None)
+                ws.append(row)
+
+        buffer = io.BytesIO()
+        wb.save(buffer)
+        buffer.seek(0)
+        return buffer
 
     @classmethod
     def load_grouped_transactions(

@@ -44,4 +44,9 @@ urlpatterns = [
         views.TransactionBulkCreate.as_view(),
         name="transaction_bulk_create",
     ),
+    path(
+        "date-range/",
+        views.TransactionsByDateRange.as_view(),
+        name="transactions_by_date_range",
+    ),
 ]

@@ -394,7 +394,9 @@ class BudgetSeriesService:
 
         old_series: BudgetSeries | None = budget.series  # type: ignore[assignment]
         old_budget_date: datetime.date | None = budget.budget_date  # type: ignore[assignment]
-        new_budget_date: datetime.date | None = validated_data.get("budget_date")
+        new_budget_date: datetime.date | None = validated_data.get(
+            "budget_date", old_budget_date
+        )
 
         # Must have a budget_date for series operations
         if not old_budget_date:
@@ -793,7 +795,7 @@ class BudgetSeriesService:
         if new_title != series.title:
             changed_fields["title"] = new_title
 
-        new_date = validated_data.get("budget_date")
+        new_date = validated_data.get("budget_date", budget.budget_date)
         if new_date != budget.budget_date:
             changed_fields["budget_date"] = new_date
 

@@ -7,9 +7,11 @@ from uuid import UUID
 
 import openpyxl
 from django.db.models import QuerySet
+from openpyxl.styles import Font
 from openpyxl.utils import get_column_letter
 
 from categories import constants as category_constants
+from categories.models import Category
 from currencies.models import Currency
 from rates.models import Rate
 from rates.utils import generate_amount_map
@@ -248,6 +250,12 @@ class TransactionService:
             group_data[parent][child][txn_date].append(amount)
             all_dates_set.add(txn_date)
 
+        for cat in Category.objects.filter(
+            workspace=workspace, type=category_constants.EXPENSE
+        ).select_related("parent"):
+            parent_name = cat.parent.name if cat.parent else cat.name
+            _ = group_data[parent_name][cat.name]
+
         all_dates = sorted(all_dates_set)
         date_col_count = len(all_dates)
         sorted_parents = sorted(group_data.keys())
@@ -291,6 +299,8 @@ class TransactionService:
             refs = ",".join(f"{col}{r}" for r in summary_rows)
             grand_row.append(f"=SUM({refs})" if refs else None)
         ws.append(grand_row)
+        for cell in ws[2]:
+            cell.font = Font(bold=True)
 
         # Row 3: weekday names
         ws.append([""] + [d.strftime("%A") for d in all_dates])

@@ -13,6 +13,7 @@ class AccountSerializer(serializers.ModelSerializer):
             "uuid",
             "user",
             "title",
+            "kind",
             "category",
             "description",
             "is_main",

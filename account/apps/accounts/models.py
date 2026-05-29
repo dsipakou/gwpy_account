@@ -2,11 +2,18 @@ import uuid
 
 from django.db import models
 
+from accounts import constants
+
 
 class Account(models.Model):
     uuid = models.UUIDField(unique=True, default=uuid.uuid4, editable=False)
     user = models.ForeignKey("users.User", on_delete=models.CASCADE, to_field="uuid")
     title = models.CharField(max_length=30)
+    kind = models.CharField(
+        max_length=20,
+        choices=constants.ACCOUNT_KINDS,
+        default=constants.SPENDING,
+    )
     category = models.ForeignKey(
         "categories.Category", to_field="uuid", null=True, on_delete=models.DO_NOTHING
     )

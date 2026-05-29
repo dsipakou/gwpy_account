@@ -4,7 +4,7 @@ from accounts.models import Account
 
 
 class AccountAdmin(admin.ModelAdmin):
-    list_display = ("title", "user_name", "created_at", "modified_at")
+    list_display = ("title", "kind", "user_name", "created_at", "modified_at")
 
     def user_name(self, obj):
         return obj.user.username

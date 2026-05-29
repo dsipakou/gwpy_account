@@ -180,3 +180,9 @@ fly-account
 .opencode/*
 .claude/*
 CLAUDE.md
+
+# Local plans
+plans/*
+
+# API
+slumber.yml
